@@ -1,1078 +1,298 @@
 <!DOCTYPE html>
-<html lang="ko" class="dark">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>실시간 데이터분석가 인포그래픽 대시보드</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>마케팅 전략 허브</title>
+
+    <!-- 테마 깜빡임 방지: 저장된 테마 → OS 설정 -->
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#eef2ff',
-                            100: '#e0e7ff',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                            900: '#312e81',
-                        }
-                    }
-                }
-            }
-        }
+        (function () {
+            let saved = null;
+            try { saved = localStorage.getItem('hub-theme'); } catch (e) {}
+            const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (dark) document.documentElement.classList.add('dark');
+        })();
     </script>
-    
-    <!-- Font Awesome Icons -->
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- PapaParse for CSV Parsing -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap');
-        body {
-            font-family: 'Pretendard', sans-serif;
-        }
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(14px);
-            border: 1px solid rgba(229, 231, 235, 0.8);
-        }
-        .dark .glass-panel {
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(14px);
-            border: 1px solid rgba(51, 65, 85, 0.5);
-        }
-        .pulse-live {
-            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
-            animation: pulse-green 2s infinite;
-        }
-        @keyframes pulse-green {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-        }
-    </style>
+    <link rel="stylesheet" href="global.css">
+    <link rel="stylesheet" href="hub.css">
 </head>
-<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-300">
+<body class="page-hub">
 
-    <!-- Top Header Navigation -->
-    <header class="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 lg:px-8 py-3.5 transition-colors">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-            <!-- Logo & Title -->
-            <div class="flex items-center space-x-3 w-full md:w-auto justify-between">
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
-                        <i class="fa-solid fa-chart-line text-lg"></i>
-                    </div>
+    <!-- ============================================================
+         Header
+         ============================================================ -->
+    <header class="app-header">
+        <div class="app-header__inner">
+            <div class="app-header__brand">
+                <a href="#/" class="brand-group" style="text-decoration:none">
+                    <div class="logo-mark"><i class="fa-solid fa-layer-group"></i></div>
                     <div>
-                        <div class="flex items-center gap-2">
-                            <h1 class="font-extrabold text-lg md:text-xl tracking-tight bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                                데이터 인사이트 인포그래픽 대시보드
-                            </h1>
-                            <span class="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-500/10 text-indigo-500 dark:bg-indigo-400/20 dark:text-indigo-300 border border-indigo-500/20">Executive Analytics</span>
+                        <div class="title-row">
+                            <h1 class="app-title">마케팅 전략 허브</h1>
+                            <span class="pill-badge">B팀 · Strategy Hub</span>
                         </div>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
-                            <span id="liveStatusBadge" class="w-2 h-2 rounded-full bg-emerald-500 pulse-live inline-block"></span>
-                            <span id="lastUpdatedText">구글 시트 연동 대기 중...</span>
-                        </p>
+                        <p class="app-subtitle">성과 대시보드 · STP · 4P Mix 등 전략 지표를 한곳에서</p>
                     </div>
-                </div>
-
-                <!-- Mobile Theme Toggle -->
-                <button id="themeToggleMobile" class="md:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
-                    <i class="fa-solid fa-moon dark:hidden"></i>
-                    <i class="fa-solid fa-sun hidden dark:inline text-amber-400"></i>
+                </a>
+                <button class="theme-toggle-mobile" onclick="toggleTheme()" aria-label="테마 전환">
+                    <i class="fa-solid fa-moon icon-moon"></i>
+                    <i class="fa-solid fa-sun icon-sun"></i>
                 </button>
             </div>
-
-            <!-- Controls & Refresh -->
-            <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
-                <div class="flex items-center bg-slate-100 dark:bg-slate-800/80 rounded-xl p-1 text-xs font-medium border border-slate-200/50 dark:border-slate-700/50">
-                    <span class="px-2 text-slate-500 dark:text-slate-400"><i class="fa-solid fa-arrows-rotate mr-1"></i>동기화:</span>
-                    <select id="autoSyncSelect" class="bg-transparent font-semibold border-none focus:ring-0 text-slate-700 dark:text-slate-200 cursor-pointer pr-2">
-                        <option value="0">수동</option>
-                        <option value="10" selected>10초</option>
-                        <option value="30">30초</option>
-                        <option value="60">1분</option>
-                    </select>
-                </div>
-
-                <button id="refreshBtn" onclick="fetchSheetData()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-all shadow-md shadow-indigo-500/20 active:scale-95 flex items-center gap-1.5">
-                    <i id="refreshSpinner" class="fa-solid fa-rotate"></i>
-                    <span>새로고침</span>
-                </button>
-
-                <button onclick="toggleUrlModal()" class="px-3 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs transition-colors" title="출처 URL 변경">
-                    <i class="fa-solid fa-link"></i>
-                </button>
-
-                <button id="themeToggleDesktop" class="hidden md:flex p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                    <i class="fa-solid fa-moon dark:hidden"></i>
-                    <i class="fa-solid fa-sun hidden dark:inline text-amber-400"></i>
+            <div class="header-controls">
+                <button class="theme-toggle" onclick="toggleTheme()" aria-label="테마 전환">
+                    <i class="fa-solid fa-moon icon-moon"></i>
+                    <i class="fa-solid fa-sun icon-sun"></i>
                 </button>
             </div>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
+    <div class="hub">
 
-        <!-- Error Alert Box -->
-        <div id="alertBox" class="hidden rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 p-4 text-amber-800 dark:text-amber-200 text-sm flex items-start justify-between">
-            <div class="flex items-center space-x-3">
-                <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500"></i>
-                <span id="alertMessage">데이터 수신 중 메시지</span>
+        <!-- ---------- 사이드바: 지표 목록 (JS 렌더링) ---------- -->
+        <nav class="sidebar" aria-label="지표 목록">
+            <div id="nav" class="nav-groups"></div>
+            <div class="sidebar__foot">
+                <strong>지표 추가</strong><br>
+                새 HTML 파일을 만들고 <code>index.html</code>의 <code>PAGES</code>에 한 줄 추가하면 이 목록과 홈 카드에 자동으로 나타납니다.
             </div>
-            <button onclick="dismissAlert()" class="text-amber-500 hover:text-amber-700"><i class="fa-solid fa-xmark"></i></button>
-        </div>
+        </nav>
 
-        <!-- Executive Summary KPI Row -->
-        <section id="kpiContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <!-- Skeletons while loading -->
-            <div class="glass-panel rounded-2xl p-5 animate-pulse space-y-3">
-                <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/2"></div>
-                <div class="h-8 bg-slate-200 dark:bg-slate-800 rounded w-3/4"></div>
-            </div>
-            <div class="glass-panel rounded-2xl p-5 animate-pulse space-y-3">
-                <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/2"></div>
-                <div class="h-8 bg-slate-200 dark:bg-slate-800 rounded w-3/4"></div>
-            </div>
-            <div class="glass-panel rounded-2xl p-5 animate-pulse space-y-3">
-                <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/2"></div>
-                <div class="h-8 bg-slate-200 dark:bg-slate-800 rounded w-3/4"></div>
-            </div>
-            <div class="glass-panel rounded-2xl p-5 animate-pulse space-y-3">
-                <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/2"></div>
-                <div class="h-8 bg-slate-200 dark:bg-slate-800 rounded w-3/4"></div>
-            </div>
-        </section>
+        <!-- ---------- 메인 ---------- -->
+        <main class="stage">
 
-        <!-- 5 KEY METRIC ANALYTICS CHARTS SECTION -->
-        <div class="flex items-center justify-between pt-2">
-            <div>
-                <h2 class="text-base font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                    <i class="fa-solid fa-chart-column text-indigo-500"></i>
-                    5대 주요 지표 데이터분석 시각화
-                </h2>
-                <p class="text-xs text-slate-500 dark:text-slate-400">데이터 구조 자동 감지 기반 다차원 통계 및 가독성 최적화 그래프</p>
-            </div>
-            <div class="flex items-center gap-2">
-                <span class="text-xs text-slate-400 hidden sm:inline">주요 수치 지표:</span>
-                <select id="primaryMetricSelect" onchange="processDataAndRender()" class="text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 font-semibold text-indigo-600 dark:text-indigo-400">
-                    <!-- Dynamic Metric Select Options -->
-                </select>
-            </div>
-        </div>
-
-        <!-- Charts Grid 1: Main Metric Comparison & Trend Analysis -->
-        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
-            <!-- CHART 1: Vertical Bar Chart (Distribution & Magnitude) -->
-            <div class="glass-panel rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div class="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800/80 pb-3">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
-                            <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm">지표 1. 범주별 정량 비교 분석 (Bar Chart)</h3>
+            <!-- 홈 (개요) -->
+            <section id="home" class="home">
+                <div class="home__inner">
+                    <div class="glass-panel hero">
+                        <div class="hero__glow"></div>
+                        <div class="hero__inner">
+                            <div>
+                                <p class="hero__eyebrow">Strategy Hub</p>
+                                <h2 class="hero__title">B팀 마케팅 전략 허브</h2>
+                                <p class="hero__desc">성과 대시보드부터 시장 세분화, 마케팅 믹스까지 전략 지표 페이지를 한곳에서 오가며 확인합니다. 왼쪽 목록이나 아래 카드에서 지표를 선택하세요.</p>
+                            </div>
+                            <div class="hero__stats">
+                                <div class="hero-stat">
+                                    <div id="statPages" class="hero-stat__value">0</div>
+                                    <div class="hero-stat__label">등록된 지표</div>
+                                </div>
+                                <div class="hero-stat">
+                                    <div id="statGroups" class="hero-stat__value">0</div>
+                                    <div class="hero-stat__label">분류</div>
+                                </div>
+                            </div>
                         </div>
-                        <p class="text-[11px] text-slate-400 mt-0.5">핵심 범주 항목별 수치 크기 및 편차 비교</p>
                     </div>
-                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300">막대형</span>
-                </div>
-                <div class="relative h-64">
-                    <canvas id="chart1Bar"></canvas>
-                </div>
-            </div>
 
-            <!-- CHART 2: Gradient Smooth Area / Line Chart (Sequence & Trend) -->
-            <div class="glass-panel rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div class="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800/80 pb-3">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                            <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm">지표 2. 데이터 흐름 및 시계열 추이 (Area Line)</h3>
+                    <div class="section-heading">
+                        <div>
+                            <h2 class="section-heading__title"><i class="fa-solid fa-grip"></i> 전략 지표</h2>
+                            <p class="section-heading__desc">카드를 누르면 허브 안에서 바로 열립니다. 작성 중인 내용은 다른 지표로 이동해도 유지됩니다.</p>
                         </div>
-                        <p class="text-[11px] text-slate-400 mt-0.5">레코드 연속성에 따른 데이터 증가/감소 변화 모니터링</p>
                     </div>
-                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-300">선형/영역</span>
+                    <div id="pageGrid" class="page-grid"></div>
                 </div>
-                <div class="relative h-64">
-                    <canvas id="chart2Line"></canvas>
-                </div>
-            </div>
+            </section>
 
-        </section>
-
-        <!-- Charts Grid 2: Horizontal Rank, Donut Breakdown, Multi-Metric Comparison -->
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            <!-- CHART 3: Horizontal Ranking Bar Chart (Top Performers & Deltas) -->
-            <div class="glass-panel rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div class="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800/80 pb-3">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                            <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm">지표 3. Top 랭킹 비교 (Horizontal Bar)</h3>
-                        </div>
-                        <p class="text-[11px] text-slate-400 mt-0.5">상위 항목 서열화 및 정밀 비교</p>
+            <!-- 지표 페이지 (iframe) -->
+            <section id="viewer" class="viewer hidden">
+                <div class="viewer__bar">
+                    <div class="crumb">
+                        <button onclick="go('')"><i class="fa-solid fa-house"></i> 허브</button>
+                        <i class="fa-solid fa-chevron-right"></i>
+                        <span id="crumbCurrent" class="crumb__current"></span>
                     </div>
-                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-300">가로 막대</span>
-                </div>
-                <div class="relative h-64">
-                    <canvas id="chart3HorizontalBar"></canvas>
-                </div>
-            </div>
-
-            <!-- CHART 4: Doughnut Distribution & Share Chart -->
-            <div class="glass-panel rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div class="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800/80 pb-3">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-violet-500"></span>
-                            <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm">지표 4. 범주 점유 비율 (Doughnut)</h3>
-                        </div>
-                        <p class="text-[11px] text-slate-400 mt-0.5">전체 대비 항목 그룹별 비중 점유율</p>
-                    </div>
-                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-violet-50 dark:bg-violet-950/60 text-violet-600 dark:text-violet-300">도넛형</span>
-                </div>
-                <div class="relative h-64 flex items-center justify-center">
-                    <canvas id="chart4Doughnut"></canvas>
-                </div>
-            </div>
-
-            <!-- CHART 5: Combined Multi-Metric / Grouped Comparison Chart -->
-            <div class="glass-panel rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div class="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800/80 pb-3">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-pink-500"></span>
-                            <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm">지표 5. 다차원 복합 지표 매핑 (Multi Bar/Line)</h3>
-                        </div>
-                        <p class="text-[11px] text-slate-400 mt-0.5">1차 수치 및 2차 지표 간 복합 상관관계</p>
-                    </div>
-                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-pink-50 dark:bg-pink-950/60 text-pink-600 dark:text-pink-300">복합 시각화</span>
-                </div>
-                <div class="relative h-64">
-                    <canvas id="chart5Multi"></canvas>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- EXECUTIVE DATA ANALYST INSIGHTS CALLOUT -->
-        <section class="glass-panel rounded-2xl p-6 shadow-sm border border-indigo-100 dark:border-indigo-950/50 relative overflow-hidden">
-            <div class="absolute right-0 top-0 translate-x-6 -translate-y-6 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
-            <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
-                <div class="space-y-2 max-w-2xl">
-                    <div class="flex items-center gap-2">
-                        <span class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[11px] shadow-sm"><i class="fa-solid fa-brain mr-1"></i>데이터 전문가 리포트</span>
-                        <span id="insightBadge" class="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">자동 분석 완료</span>
-                    </div>
-                    <h3 class="font-extrabold text-base text-slate-800 dark:text-slate-100">핵심 통계 진단 및 이상치 패턴</h3>
-                    <p id="insightText" class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                        데이터 수집이 완료되면 주요 최댓값 항목과 분산 통계가 자동으로 요약 작성됩니다.
-                    </p>
-                </div>
-                
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:w-auto">
-                    <div class="p-3 rounded-xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-center">
-                        <p class="text-[10px] text-slate-400 font-medium">최고 수치 피크</p>
-                        <p id="statMaxVal" class="text-sm font-black text-indigo-600 dark:text-indigo-400 mt-0.5">-</p>
-                    </div>
-                    <div class="p-3 rounded-xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-center">
-                        <p class="text-[10px] text-slate-400 font-medium">평균 대표 수치</p>
-                        <p id="statAvgVal" class="text-sm font-black text-emerald-600 dark:text-emerald-400 mt-0.5">-</p>
-                    </div>
-                    <div class="p-3 rounded-xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-center col-span-2 sm:col-span-1">
-                        <p class="text-[10px] text-slate-400 font-medium">데이터 집중 비율</p>
-                        <p id="statConcentration" class="text-sm font-black text-violet-600 dark:text-violet-400 mt-0.5">-</p>
+                    <div class="viewer__actions">
+                        <button class="icon-btn" onclick="reloadCurrent()" title="새로고침 (작성 내용이 초기화됩니다)">
+                            <i class="fa-solid fa-rotate-right"></i><span class="icon-btn__text">새로고침</span>
+                        </button>
+                        <button class="icon-btn" onclick="openCurrent()" title="새 탭에서 단독으로 열기">
+                            <i class="fa-solid fa-up-right-from-square"></i><span class="icon-btn__text">새 탭</span>
+                        </button>
                     </div>
                 </div>
-            </div>
-        </section>
+                <div id="frames" class="frames"></div>
+            </section>
 
-        <!-- Data Table Section -->
-        <section class="glass-panel rounded-2xl p-5 shadow-sm space-y-4">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base flex items-center gap-2">
-                        <i class="fa-solid fa-table text-indigo-500"></i>
-                        실시간 전수 데이터 탐색기
-                    </h3>
-                    <p class="text-xs text-slate-400">연동된 구글 시트 원본 데이터 검증 및 필터링 검색</p>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-2.5">
-                    <!-- Search Input -->
-                    <div class="relative min-w-[200px]">
-                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                        <input type="text" id="searchInput" oninput="filterTable()" placeholder="검색어 입력..." class="w-full pl-8 pr-3 py-1.5 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200">
-                    </div>
-
-                    <!-- Category Filter -->
-                    <select id="categoryFilter" onchange="filterTable()" class="text-xs bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 text-slate-700 dark:text-slate-200">
-                        <option value="ALL">전체 범주 보기</option>
-                    </select>
-
-                    <!-- Export Button -->
-                    <button onclick="exportFilteredCSV()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-transform active:scale-95">
-                        <i class="fa-solid fa-file-excel"></i>
-                        <span>CSV 추출</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Table Wrapper -->
-            <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                <table class="w-full text-left border-collapse text-xs">
-                    <thead id="tableHead" class="bg-slate-100/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
-                    </thead>
-                    <tbody id="tableBody" class="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white/40 dark:bg-slate-900/40">
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Table Pagination -->
-            <div class="flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 pt-2 gap-2">
-                <div>
-                    총 <span id="filteredCount" class="font-bold text-slate-800 dark:text-slate-200">0</span>개 데이터 표시 중 (전체 <span id="totalRowCount">0</span>개)
-                </div>
-                <div class="flex items-center space-x-2">
-                    <button id="prevPageBtn" onclick="changePage(-1)" class="px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50">이전</button>
-                    <span id="pageIndicator" class="font-medium">1 / 1</span>
-                    <button id="nextPageBtn" onclick="changePage(1)" class="px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50">다음</button>
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- Custom CSV URL Modal -->
-    <div id="urlModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                <h3 class="font-bold text-base flex items-center gap-2">
-                    <i class="fa-solid fa-link text-indigo-500"></i>
-                    구글 시트 연동 URL 설정
-                </h3>
-                <button onclick="toggleUrlModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <p class="text-xs text-slate-500 leading-relaxed">
-                구글 시트의 <strong>[파일] &gt; [공유] &gt; [웹에 게시]</strong>에서 형식으로 <strong>CSV</strong>를 선택한 URL을 입력하시면 실시간 동기화됩니다.
-            </p>
-            <div>
-                <label class="block text-xs font-semibold mb-1 text-slate-700 dark:text-slate-300">게시된 CSV URL</label>
-                <input type="text" id="customUrlInput" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200" placeholder="https://docs.google.com/spreadsheets/.../pub?output=csv">
-            </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="toggleUrlModal()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium text-xs">취소</button>
-                <button onclick="saveCustomUrl()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-500/20">적용하기</button>
-            </div>
-        </div>
+        </main>
     </div>
 
     <script>
-        // Default Google Sheet CSV URL
-        let currentCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vToEQ5IQOZe8Hve6pRnysrJuHVEm6sFFznrVI6yBTYSRRzvu9PeAMTFBwg5zQZzX1hgGxiL-miRp_gS/pub?output=csv';
-
-        // Global Application State
-        let rawData = [];
-        let headers = [];
-        let filteredData = [];
-        let numericColumns = [];
-        let categoricalColumns = [];
-        let primaryCategoryCol = '';
-        let primaryNumericCol = '';
-        let secondaryNumericCol = '';
-        
-        let autoSyncTimer = null;
-        let currentPage = 1;
-        const pageSize = 10;
-
-        // Chart Instances
-        let chart1BarInst = null;
-        let chart2LineInst = null;
-        let chart3HorizInst = null;
-        let chart4DoughnutInst = null;
-        let chart5MultiInst = null;
-
-        // Startup Handler
-        window.onload = function() {
-            initTheme();
-            setupAutoSync();
-            fetchSheetData();
-        };
-
-        function initTheme() {
-            const themeToggleBtnMobile = document.getElementById('themeToggleMobile');
-            const themeToggleBtnDesktop = document.getElementById('themeToggleDesktop');
-            
-            const toggleFunc = () => {
-                document.documentElement.classList.toggle('dark');
-                updateAll5Charts(); // Re-render chart text colors on theme change
-            };
-
-            if(themeToggleBtnMobile) themeToggleBtnMobile.onclick = toggleFunc;
-            if(themeToggleBtnDesktop) themeToggleBtnDesktop.onclick = toggleFunc;
-        }
-
-        function setupAutoSync() {
-            const select = document.getElementById('autoSyncSelect');
-            select.addEventListener('change', (e) => {
-                if(autoSyncTimer) clearInterval(autoSyncTimer);
-                const intervalSec = parseInt(e.target.value);
-                if(intervalSec > 0) {
-                    autoSyncTimer = setInterval(() => {
-                        fetchSheetData(true);
-                    }, intervalSec * 1000);
-                }
-            });
-
-            autoSyncTimer = setInterval(() => {
-                fetchSheetData(true);
-            }, 10000);
-        }
-
-        async function fetchSheetData(isSilent = false) {
-            const spinner = document.getElementById('refreshSpinner');
-            if(!isSilent && spinner) spinner.classList.add('fa-spin');
-
-            try {
-                const urlWithBuster = currentCsvUrl + (currentCsvUrl.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
-                
-                Papa.parse(urlWithBuster, {
-                    download: true,
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: function(results) {
-                        if (results.data && results.data.length > 0) {
-                            rawData = results.data;
-                            headers = results.meta.fields || Object.keys(rawData[0]);
-                            processDataAndRender();
-                            updateLastUpdatedTime();
-                            dismissAlert();
-                        } else {
-                            showError("수신된 데이터가 비어있어 데모 샘플 데이터로 전환합니다.");
-                            loadFallbackDemoData();
-                        }
-                        if(!isSilent && spinner) spinner.classList.remove('fa-spin');
-                    },
-                    error: function(err) {
-                        console.warn("Direct CSV Fetch failed, trying CORS proxy fallback...", err);
-                        fetchViaProxy(currentCsvUrl, isSilent);
-                    }
-                });
-            } catch (error) {
-                console.error("Fetch Exception:", error);
-                fetchViaProxy(currentCsvUrl, isSilent);
+        /* =============================================================
+           지표 레지스트리 — 새 지표는 여기에 한 항목만 추가하면 됩니다.
+           -------------------------------------------------------------
+           id     : 주소에 쓰이는 고유값 (index.html#/id)
+           title  : 메뉴·카드 제목          desc : 한 줄 설명
+           group  : 사이드바 분류            icon : Font Awesome 아이콘 이름
+           src    : 페이지 파일 (global.css 기반, 같은 폴더)
+           accent : indigo · pink · emerald · amber · blue · violet
+           tags   : 카드에 표시할 키워드
+           ============================================================= */
+        const PAGES = [
+            {
+                id: 'dashboard',
+                title: '4차년도 성과 대시보드',
+                desc: '구글 시트 실시간 연동 KPI · 5대 지표 차트 · 데이터 탐색기',
+                group: '성과 분석',
+                icon: 'fa-chart-line',
+                src: '4차년도 성과 대시보드.html',
+                accent: 'blue',
+                tags: ['KPI', '실시간 동기화', '차트 5종', 'CSV 추출']
+            },
+            {
+                id: 'stp',
+                title: 'STP 전략',
+                desc: '가격 × 제품 모델 기준 한국·미국·중국 포지셔닝 전후 비교',
+                group: '시장 전략',
+                icon: 'fa-crosshairs',
+                src: 'stp_strategy.html',
+                accent: 'indigo',
+                tags: ['Segmentation', 'Targeting', 'Positioning', '3개 시장']
+            },
+            {
+                id: '4p',
+                title: '4P Mix',
+                desc: '제품·가격·유통·판촉 전략 수립 및 HTML·마크다운 내보내기',
+                group: '마케팅 믹스',
+                icon: 'fa-chart-pie',
+                src: '4p_mix_strategy_builder.html',
+                accent: 'pink',
+                tags: ['Product', 'Price', 'Place', 'Promotion']
             }
+        ];
+
+        /* ---------- 유틸 ---------- */
+        function esc(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+        const isDark = () => document.documentElement.classList.contains('dark');
+        const pageById = id => PAGES.find(p => p.id === id);
+        const groups = () => [...new Set(PAGES.map(p => p.group))];
+
+        /* ---------- 사이드바 ---------- */
+        function renderNav(activeId) {
+            const home = `
+                <div class="nav-group">
+                    <button class="nav-item${!activeId ? ' is-active' : ''}" onclick="go('')">
+                        <span class="nav-item__icon"><i class="fa-solid fa-house"></i></span>
+                        <span class="nav-item__text"><span class="nav-item__title">허브 홈</span><span class="nav-item__desc">전체 지표 한눈에 보기</span></span>
+                    </button>
+                </div>`;
+            const grouped = groups().map(g => `
+                <div class="nav-group">
+                    <div class="nav-group__label">${esc(g)}</div>
+                    ${PAGES.filter(p => p.group === g).map(p => `
+                        <button class="nav-item accent--${esc(p.accent)}${p.id === activeId ? ' is-active' : ''}" onclick="go('${esc(p.id)}')">
+                            <span class="nav-item__icon"><i class="fa-solid ${esc(p.icon)}"></i></span>
+                            <span class="nav-item__text">
+                                <span class="nav-item__title">${esc(p.title)}</span>
+                                <span class="nav-item__desc">${esc(p.desc)}</span>
+                            </span>
+                        </button>`).join('')}
+                </div>`).join('');
+            document.getElementById('nav').innerHTML = home + grouped;
         }
 
-        async function fetchViaProxy(url, isSilent) {
-            const spinner = document.getElementById('refreshSpinner');
-            try {
-                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-                const res = await fetch(proxyUrl);
-                const csvText = await res.text();
-                
-                Papa.parse(csvText, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: function(results) {
-                        if (results.data && results.data.length > 0) {
-                            rawData = results.data;
-                            headers = results.meta.fields || Object.keys(rawData[0]);
-                            processDataAndRender();
-                            updateLastUpdatedTime();
-                            dismissAlert();
-                        } else {
-                            loadFallbackDemoData();
-                        }
-                        if(!isSilent && spinner) spinner.classList.remove('fa-spin');
-                    }
-                });
-            } catch(e) {
-                console.error("Proxy fetch failed:", e);
-                loadFallbackDemoData();
-                if(!isSilent && spinner) spinner.classList.remove('fa-spin');
-            }
+        /* ---------- 홈 카드 ---------- */
+        function renderHome() {
+            document.getElementById('statPages').textContent = PAGES.length;
+            document.getElementById('statGroups').textContent = groups().length;
+            document.getElementById('pageGrid').innerHTML = PAGES.map(p => `
+                <button class="glass-panel page-card accent--${esc(p.accent)}" onclick="go('${esc(p.id)}')">
+                    <div class="page-card__top">
+                        <span class="page-card__icon"><i class="fa-solid ${esc(p.icon)}"></i></span>
+                        <span class="page-card__group">${esc(p.group)}</span>
+                    </div>
+                    <div>
+                        <div class="page-card__title">${esc(p.title)}</div>
+                        <p class="page-card__desc">${esc(p.desc)}</p>
+                    </div>
+                    <div class="page-card__tags">${(p.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
+                    <div class="page-card__foot">
+                        <span>${esc(p.src)}</span>
+                        <span class="page-card__open">열기 <i class="fa-solid fa-arrow-right"></i></span>
+                    </div>
+                </button>`).join('') + `
+                <div class="glass-panel page-card page-card--add">
+                    <i class="fa-solid fa-circle-plus"></i>
+                    <div class="page-card__title">새 지표 자리</div>
+                    <p class="page-card__desc">페이지를 만들고 <code>PAGES</code>에 추가하면<br>이곳에 카드가 생깁니다.</p>
+                </div>`;
         }
 
-        function processDataAndRender() {
-            if (!rawData || rawData.length === 0) return;
-
-            // Classify Columns into Numeric vs Categorical
-            numericColumns = [];
-            categoricalColumns = [];
-
-            headers.forEach(header => {
-                let numericCount = 0;
-                let sampleSize = Math.min(rawData.length, 30);
-                
-                for (let i = 0; i < sampleSize; i++) {
-                    const val = rawData[i][header];
-                    if (val !== undefined && val !== null && val !== '') {
-                        const cleanVal = String(val).replace(/[\$,%,\s]/g, '');
-                        if (!isNaN(Number(cleanVal))) {
-                            numericCount++;
-                        }
-                    }
-                }
-
-                if (numericCount >= sampleSize * 0.5) {
-                    numericColumns.push(header);
-                } else {
-                    categoricalColumns.push(header);
-                }
-            });
-
-            primaryCategoryCol = categoricalColumns[0] || headers[0];
-
-            // Populate Main Metric Selection Dropdown
-            populateMetricDropdowns();
-
-            // Set chosen primary metric
-            const selectedDropdownVal = document.getElementById('primaryMetricSelect').value;
-            primaryNumericCol = selectedDropdownVal || numericColumns[0] || (headers.length > 1 ? headers[1] : headers[0]);
-            secondaryNumericCol = numericColumns[1] || numericColumns[0] || primaryNumericCol;
-
-            // Populate Category Filter
-            populateCategoryFilter();
-
-            filteredData = [...rawData];
-
-            // Render Dashboard Sections
-            renderKPIs();
-            updateAll5Charts();
-            renderInsightsReport();
-            renderTable();
+        /* ---------- iframe: 지표별로 한 번만 만들고 유지 (입력 내용 보존) ---------- */
+        const frames = {};
+        function frameSrc(p) {
+            return `${encodeURI(p.src)}?embed=1&theme=${isDark() ? 'dark' : 'light'}`;
+        }
+        function ensureFrame(p) {
+            if (frames[p.id]) return frames[p.id];
+            const iframe = document.createElement('iframe');
+            iframe.className = 'frame';
+            iframe.title = p.title;
+            iframe.src = frameSrc(p);
+            iframe.addEventListener('load', () => syncTheme(iframe));
+            document.getElementById('frames').appendChild(iframe);
+            frames[p.id] = iframe;
+            return iframe;
+        }
+        function syncTheme(iframe) {
+            iframe.contentWindow?.postMessage({ type: 'hub-theme', dark: isDark() }, '*');
         }
 
-        function populateMetricDropdowns() {
-            const select = document.getElementById('primaryMetricSelect');
-            const currentVal = select.value;
-            select.innerHTML = '';
-            
-            if (numericColumns.length === 0) {
-                const opt = document.createElement('option');
-                opt.value = 'count';
-                opt.textContent = '레코드 건수';
-                select.appendChild(opt);
-                return;
-            }
+        /* ---------- 라우팅 (#/id) ---------- */
+        let currentId = '';
+        function go(id) {
+            location.hash = id ? '#/' + id : '#/';
+        }
+        function route() {
+            const id = location.hash.replace(/^#\/?/, '');
+            const page = pageById(id);
+            currentId = page ? page.id : '';
 
-            numericColumns.forEach(col => {
-                const opt = document.createElement('option');
-                opt.value = col;
-                opt.textContent = col;
-                select.appendChild(opt);
-            });
+            document.getElementById('home').classList.toggle('hidden', !!page);
+            document.getElementById('viewer').classList.toggle('hidden', !page);
+            renderNav(currentId);
 
-            if (currentVal && numericColumns.includes(currentVal)) {
-                select.value = currentVal;
+            if (page) {
+                const active = ensureFrame(page);
+                Object.values(frames).forEach(f => f.classList.toggle('hidden', f !== active));
+                const crumb = document.getElementById('crumbCurrent');
+                crumb.className = `crumb__current accent--${page.accent}`;
+                crumb.innerHTML = `<i class="fa-solid ${esc(page.icon)}"></i>${esc(page.title)}`;
+                document.title = `${page.title} · 마케팅 전략 허브`;
             } else {
-                select.value = numericColumns[0];
+                document.title = '마케팅 전략 허브';
             }
         }
 
-        function populateCategoryFilter() {
-            const filterSelect = document.getElementById('categoryFilter');
-            filterSelect.innerHTML = '<option value="ALL">전체 범주 보기</option>';
-
-            if (!primaryCategoryCol) return;
-
-            const categories = [...new Set(rawData.map(item => item[primaryCategoryCol]))].filter(Boolean);
-            categories.slice(0, 30).forEach(cat => {
-                const opt = document.createElement('option');
-                opt.value = cat;
-                opt.textContent = cat;
-                filterSelect.appendChild(opt);
-            });
-        }
-
-        function renderKPIs() {
-            const kpiContainer = document.getElementById('kpiContainer');
-            kpiContainer.innerHTML = '';
-
-            const totalCount = rawData.length;
-
-            let metricSum = 0;
-            if (primaryNumericCol) {
-                metricSum = rawData.reduce((acc, curr) => {
-                    const num = parseFloat(String(curr[primaryNumericCol] || 0).replace(/[\$,%,\s]/g, ''));
-                    return acc + (isNaN(num) ? 0 : num);
-                }, 0);
-            }
-
-            const metricAvg = totalCount > 0 ? (metricSum / totalCount) : 0;
-            const uniqueCats = new Set(rawData.map(item => item[primaryCategoryCol])).size;
-
-            const kpis = [
-                {
-                    title: '총 분석 레코드 수',
-                    value: totalCount.toLocaleString() + '건',
-                    icon: 'fa-database',
-                    color: 'from-blue-500 to-indigo-600',
-                    badge: '전수 데이터',
-                    badgeColor: 'bg-blue-500/10 text-blue-500 dark:bg-blue-400/20 dark:text-blue-300'
-                },
-                {
-                    title: `${primaryNumericCol} 누적 총합`,
-                    value: formatNumber(metricSum),
-                    icon: 'fa-calculator',
-                    color: 'from-indigo-500 to-violet-600',
-                    badge: 'Sum Metric',
-                    badgeColor: 'bg-indigo-500/10 text-indigo-500 dark:bg-indigo-400/20 dark:text-indigo-300'
-                },
-                {
-                    title: `${primaryNumericCol} 산술 평균`,
-                    value: formatNumber(metricAvg),
-                    icon: 'fa-chart-line',
-                    color: 'from-violet-500 to-purple-600',
-                    badge: 'Average',
-                    badgeColor: 'bg-violet-500/10 text-violet-500 dark:bg-violet-400/20 dark:text-violet-300'
-                },
-                {
-                    title: '고유 범주 분류 그룹',
-                    value: uniqueCats.toLocaleString() + '개 그룹',
-                    icon: 'fa-layer-group',
-                    color: 'from-emerald-500 to-teal-600',
-                    badge: 'Categories',
-                    badgeColor: 'bg-emerald-500/10 text-emerald-500 dark:bg-emerald-400/20 dark:text-emerald-300'
-                }
-            ];
-
-            kpis.forEach(kpi => {
-                const card = document.createElement('div');
-                card.className = 'glass-panel rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex items-center justify-between border border-slate-200/60 dark:border-slate-800/80';
-                card.innerHTML = `
-                    <div class="space-y-1">
-                        <div class="flex items-center space-x-2">
-                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">${kpi.title}</span>
-                            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full ${kpi.badgeColor}">${kpi.badge}</span>
-                        </div>
-                        <p class="text-2xl font-black tracking-tight text-slate-800 dark:text-slate-100">${kpi.value}</p>
-                    </div>
-                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr ${kpi.color} flex items-center justify-center text-white shadow-lg shadow-indigo-500/10">
-                        <i class="fa-solid ${kpi.icon} text-lg"></i>
-                    </div>
-                `;
-                kpiContainer.appendChild(card);
-            });
-        }
-
-        function updateAll5Charts() {
-            if (!rawData || rawData.length === 0) return;
-
-            const isDark = document.documentElement.classList.contains('dark');
-            const textColor = isDark ? '#cbd5e1' : '#475569';
-            const gridColor = isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(226, 232, 240, 0.8)';
-
-            // Prepare Aggregated Category Data
-            const catAgg = {};
-            rawData.forEach(item => {
-                const cat = item[primaryCategoryCol] || '기타';
-                let val = 1;
-                if (primaryNumericCol && item[primaryNumericCol] !== undefined) {
-                    const parsed = parseFloat(String(item[primaryNumericCol]).replace(/[\$,%,\s]/g, ''));
-                    val = isNaN(parsed) ? 0 : parsed;
-                }
-                catAgg[cat] = (catAgg[cat] || 0) + val;
-            });
-
-            const topCategories = Object.entries(catAgg).sort((a,b) => b[1] - a[1]).slice(0, 10);
-            const labels1 = topCategories.map(c => c[0]);
-            const values1 = topCategories.map(c => c[1]);
-
-            // Dynamic Palette Colors
-            const palette = [
-                '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6',
-                '#3b82f6', '#14b8a6', '#f43f5e', '#84cc16', '#a855f7'
-            ];
-
-            // --- CHART 1: Vertical Bar Chart ---
-            const ctx1 = document.getElementById('chart1Bar').getContext('2d');
-            if (chart1BarInst) chart1BarInst.destroy();
-            chart1BarInst = new Chart(ctx1, {
-                type: 'bar',
-                data: {
-                    labels: labels1,
-                    datasets: [{
-                        label: primaryNumericCol,
-                        data: values1,
-                        backgroundColor: '#6366f1',
-                        hoverBackgroundColor: '#4f46e5',
-                        borderRadius: 8,
-                        borderSkipped: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } },
-                        y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } }
-                    }
-                }
-            });
-
-            // --- CHART 2: Gradient Area / Line Chart ---
-            const ctx2 = document.getElementById('chart2Line').getContext('2d');
-            if (chart2LineInst) chart2LineInst.destroy();
-
-            const lineSample = rawData.slice(0, 20);
-            const labels2 = lineSample.map((_, i) => `#${i + 1}`);
-            const values2 = lineSample.map(item => {
-                if (primaryNumericCol && item[primaryNumericCol] !== undefined) {
-                    const parsed = parseFloat(String(item[primaryNumericCol]).replace(/[\$,%,\s]/g, ''));
-                    return isNaN(parsed) ? 0 : parsed;
-                }
-                return 1;
-            });
-
-            const gradientFill = ctx2.createLinearGradient(0, 0, 0, 200);
-            gradientFill.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
-            gradientFill.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
-
-            chart2LineInst = new Chart(ctx2, {
-                type: 'line',
-                data: {
-                    labels: labels2,
-                    datasets: [{
-                        label: '시퀀스 흐름',
-                        data: values2,
-                        borderColor: '#10b981',
-                        borderWidth: 2.5,
-                        backgroundColor: gradientFill,
-                        fill: true,
-                        tension: 0.35,
-                        pointBackgroundColor: '#10b981',
-                        pointHoverRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } },
-                        y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } }
-                    }
-                }
-            });
-
-            // --- CHART 3: Horizontal Ranking Bar Chart ---
-            const ctx3 = document.getElementById('chart3HorizontalBar').getContext('2d');
-            if (chart3HorizInst) chart3HorizInst.destroy();
-
-            const top5Rank = topCategories.slice(0, 6);
-            chart3HorizInst = new Chart(ctx3, {
-                type: 'bar',
-                data: {
-                    labels: top5Rank.map(c => c[0]),
-                    datasets: [{
-                        label: '수치 점수',
-                        data: top5Rank.map(c => c[1]),
-                        backgroundColor: '#f59e0b',
-                        borderRadius: 6,
-                        indexAxis: 'y'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    indexAxis: 'y',
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } },
-                        y: { grid: { display: false }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } }
-                    }
-                }
-            });
-
-            // --- CHART 4: Doughnut Distribution Chart ---
-            const ctx4 = document.getElementById('chart4Doughnut').getContext('2d');
-            if (chart4DoughnutInst) chart4DoughnutInst.destroy();
-
-            chart4DoughnutInst = new Chart(ctx4, {
-                type: 'doughnut',
-                data: {
-                    labels: labels1.slice(0, 6),
-                    datasets: [{
-                        data: values1.slice(0, 6),
-                        backgroundColor: palette.slice(0, 6),
-                        borderWidth: 0,
-                        hoverOffset: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '68%',
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { boxWidth: 8, font: { size: 10, family: 'Pretendard' }, color: textColor }
-                        }
-                    }
-                }
-            });
-
-            // --- CHART 5: Multi-Metric / Dual Line-Bar Chart ---
-            const ctx5 = document.getElementById('chart5Multi').getContext('2d');
-            if (chart5MultiInst) chart5MultiInst.destroy();
-
-            // Calculate secondary metric dataset or generated secondary analysis
-            const secValues = topCategories.map((catEntry) => {
-                const subItems = rawData.filter(d => d[primaryCategoryCol] === catEntry[0]);
-                if (secondaryNumericCol && secondaryNumericCol !== primaryNumericCol) {
-                    const sumSec = subItems.reduce((acc, curr) => {
-                        const parsed = parseFloat(String(curr[secondaryNumericCol] || 0).replace(/[\$,%,\s]/g, ''));
-                        return acc + (isNaN(parsed) ? 0 : parsed);
-                    }, 0);
-                    return subItems.length > 0 ? (sumSec / subItems.length) : 0;
-                }
-                return subItems.length; // Fallback to record count per category
-            });
-
-            chart5MultiInst = new Chart(ctx5, {
-                type: 'bar',
-                data: {
-                    labels: labels1.slice(0, 7),
-                    datasets: [
-                        {
-                            type: 'bar',
-                            label: `${primaryNumericCol} (합계)`,
-                            data: values1.slice(0, 7),
-                            backgroundColor: '#8b5cf6',
-                            borderRadius: 6
-                        },
-                        {
-                            type: 'line',
-                            label: secondaryNumericCol && secondaryNumericCol !== primaryNumericCol ? `${secondaryNumericCol} (평균)` : '건수 수량',
-                            data: secValues.slice(0, 7),
-                            borderColor: '#ec4899',
-                            borderWidth: 2,
-                            pointBackgroundColor: '#ec4899',
-                            tension: 0.3
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: { boxWidth: 8, font: { size: 10, family: 'Pretendard' }, color: textColor }
-                        }
-                    },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } },
-                        y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } }
-                    }
-                }
-            });
-        }
-
-        function renderInsightsReport() {
-            if (!rawData || rawData.length === 0) return;
-
-            let maxVal = -Infinity;
-            let maxItemName = '-';
-            let sum = 0;
-            let validCount = 0;
-
-            rawData.forEach(item => {
-                const name = item[primaryCategoryCol] || '항목';
-                if (primaryNumericCol && item[primaryNumericCol] !== undefined) {
-                    const parsed = parseFloat(String(item[primaryNumericCol]).replace(/[\$,%,\s]/g, ''));
-                    if (!isNaN(parsed)) {
-                        sum += parsed;
-                        validCount++;
-                        if (parsed > maxVal) {
-                            maxVal = parsed;
-                            maxItemName = name;
-                        }
-                    }
-                }
-            });
-
-            const avgVal = validCount > 0 ? (sum / validCount) : 0;
-            const concentrationPct = sum > 0 && maxVal > 0 ? Math.round((maxVal / sum) * 100) : 0;
-
-            document.getElementById('statMaxVal').textContent = maxVal !== -Infinity ? formatNumber(maxVal) : '-';
-            document.getElementById('statAvgVal').textContent = formatNumber(avgVal);
-            document.getElementById('statConcentration').textContent = concentrationPct + '%';
-
-            document.getElementById('insightText').innerHTML = `
-                전체 <strong>${rawData.length.toLocaleString()}건</strong>의 분석 데이터 중 가장 유의미한 최고 수치는 
-                <span class="font-bold text-indigo-600 dark:text-indigo-400">'${escapeHtml(maxItemName)}'</span> 항목에서 
-                <strong>${formatNumber(maxVal)}</strong>로 측정되었습니다. 
-                주요 Top 범주가 전체 데이터 수치 합계의 약 <strong>${concentrationPct}%</strong> 비중을 점유하고 있어 집중도가 관찰됩니다.
-            `;
-        }
-
-        function renderTable() {
-            const tableHead = document.getElementById('tableHead');
-            const tableBody = document.getElementById('tableBody');
-
-            if (!headers || headers.length === 0) return;
-
-            tableHead.innerHTML = `
-                <tr>
-                    <th class="px-4 py-3 border-b border-slate-200 dark:border-slate-800">#</th>
-                    ${headers.map(h => `<th class="px-4 py-3 border-b border-slate-200 dark:border-slate-800">${escapeHtml(h)}</th>`).join('')}
-                </tr>
-            `;
-
-            const startIdx = (currentPage - 1) * pageSize;
-            const endIdx = startIdx + pageSize;
-            const pageData = filteredData.slice(startIdx, endIdx);
-
-            document.getElementById('filteredCount').textContent = filteredData.length.toLocaleString();
-            document.getElementById('totalRowCount').textContent = rawData.length.toLocaleString();
-
-            const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
-            document.getElementById('pageIndicator').textContent = `${currentPage} / ${totalPages}`;
-
-            document.getElementById('prevPageBtn').disabled = currentPage === 1;
-            document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
-
-            if (pageData.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="${headers.length + 1}" class="text-center py-6 text-slate-400">조건에 부합하는 데이터가 없습니다.</td></tr>`;
-                return;
-            }
-
-            tableBody.innerHTML = pageData.map((row, idx) => `
-                <tr class="hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 transition-colors">
-                    <td class="px-4 py-2.5 font-medium text-slate-400">${startIdx + idx + 1}</td>
-                    ${headers.map(h => {
-                        const val = row[h] !== undefined ? String(row[h]) : '';
-                        const isNum = !isNaN(Number(val.replace(/[\$,%,\s]/g, ''))) && val.trim() !== '';
-                        return `<td class="px-4 py-2.5 ${isNum ? 'font-mono text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}">${escapeHtml(val)}</td>`;
-                    }).join('')}
-                </tr>
-            `).join('');
-        }
-
-        function filterTable() {
-            const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
-            const catVal = document.getElementById('categoryFilter').value;
-
-            filteredData = rawData.filter(row => {
-                if (catVal !== 'ALL' && row[primaryCategoryCol] !== catVal) {
-                    return false;
-                }
-                if (searchVal) {
-                    return Object.values(row).some(val => 
-                        String(val).toLowerCase().includes(searchVal)
-                    );
-                }
-                return true;
-            });
-
-            currentPage = 1;
-            renderTable();
-        }
-
-        function changePage(delta) {
-            const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
-            const newPage = currentPage + delta;
-            if (newPage >= 1 && newPage <= totalPages) {
-                currentPage = newPage;
-                renderTable();
+        function reloadCurrent() {
+            const p = pageById(currentId);
+            if (p && frames[p.id] && confirm('이 지표를 새로고침하면 작성 중인 내용이 사라집니다. 계속할까요?')) {
+                frames[p.id].src = frameSrc(p);
             }
         }
-
-        function exportFilteredCSV() {
-            if (!filteredData || filteredData.length === 0) {
-                showError("저장할 데이터가 없습니다.");
-                return;
-            }
-            const csv = Papa.unparse(filteredData);
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.setAttribute('href', url);
-            link.setAttribute('download', `analytics_export_${new Date().toISOString().slice(0, 10)}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        function openCurrent() {
+            const p = pageById(currentId);
+            if (p) window.open(encodeURI(p.src), '_blank', 'noopener');
         }
 
-        function toggleUrlModal() {
-            const modal = document.getElementById('urlModal');
-            document.getElementById('customUrlInput').value = currentCsvUrl;
-            modal.classList.toggle('hidden');
+        function toggleTheme() {
+            const dark = document.documentElement.classList.toggle('dark');
+            try { localStorage.setItem('hub-theme', dark ? 'dark' : 'light'); } catch (e) {}
+            Object.values(frames).forEach(syncTheme);
         }
 
-        function saveCustomUrl() {
-            const newUrl = document.getElementById('customUrlInput').value.trim();
-            if (newUrl) {
-                currentCsvUrl = newUrl;
-                toggleUrlModal();
-                fetchSheetData();
-            }
-        }
-
-        function loadFallbackDemoData() {
-            headers = ['카테고리', '항목명', '수량', '금액(원)', '성공률(%)'];
-            rawData = [
-                { '카테고리': '전자기기', '항목명': '스마트폰 A', '수량': '125', '금액(원)': '1350000', '성공률(%)': '98' },
-                { '카테고리': '전자기기', '항목명': '노트북 Pro', '수량': '88', '금액(원)': '2800000', '성공률(%)': '94' },
-                { '카테고리': '생활가전', '항목명': '공기청정기', '수량': '160', '금액(원)': '450000', '성공률(%)': '91' },
-                { '카테고리': '생활가전', '항목명': '로봇청소기', '수량': '94', '금액(원)': '890000', '성공률(%)': '89' },
-                { '카테고리': '사무용품', '항목명': '모니터 암', '수량': '210', '금액(원)': '85000', '성공률(%)': '99' },
-                { '카테고리': '사무용품', '항목명': '모션데스크', '수량': '79', '금액(원)': '620000', '성공률(%)': '93' },
-                { '카테고리': '의류/패션', '항목명': '기능성 티셔츠', '수량': '340', '금액(원)': '35000', '성공률(%)': '96' },
-                { '카테고리': '의류/패션', '항목명': '경량 패딩', '수량': '185', '금액(원)': '129000', '성공률(%)': '92' }
-            ];
-            processDataAndRender();
-            updateLastUpdatedTime('데모 샘플 모드');
-        }
-
-        function updateLastUpdatedTime(prefix = '최근 동기화') {
-            const now = new Date();
-            const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-            document.getElementById('lastUpdatedText').textContent = `${prefix}: 오늘 ${timeStr}`;
-        }
-
-        function formatNumber(val) {
-            if (isNaN(val)) return val;
-            if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
-            if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
-            return Number(val.toFixed(1)).toLocaleString();
-        }
-
-        function showError(msg) {
-            const alertBox = document.getElementById('alertBox');
-            document.getElementById('alertMessage').textContent = msg;
-            alertBox.classList.remove('hidden');
-        }
-
-        function dismissAlert() {
-            document.getElementById('alertBox').classList.add('hidden');
-        }
-
-        function escapeHtml(text) {
-            if (text === null || text === undefined) return '';
-            return String(text)
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
+        window.addEventListener('hashchange', route);
+        renderHome();
+        route();
     </script>
 </body>
 </html>

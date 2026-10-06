@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STP 전략 전후 비교</title>
+
+    <!-- 테마 깜빡임 방지 + 허브 임베드 감지
+         테마 우선순위: 허브가 넘긴 ?theme= → 저장된 테마 → OS 설정
+         허브(index.html) 안에서 열리면 html.is-embedded → 로고·테마 버튼·푸터 숨김 -->
+    <script>
+        (function () {
+            const root = document.documentElement;
+            const params = new URLSearchParams(location.search);
+            let saved = null;
+            try { saved = localStorage.getItem('stp-theme'); } catch (e) {}
+            const fromHub = params.get('theme');
+            const dark = fromHub ? fromHub === 'dark'
+                : saved ? saved === 'dark'
+                : window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (dark) root.classList.add('dark');
+
+            if (window.self !== window.top || params.has('embed')) root.classList.add('is-embedded');
+
+            // 허브에서 테마를 바꾸면 따라감
+            window.addEventListener('message', e => {
+                if (e.source === window.parent && e.data && e.data.type === 'hub-theme') {
+                    root.classList.toggle('dark', !!e.data.dark);
+                }
+            });
+        })();
+    </script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 공통 디자인 시스템 + 페이지 전용 스타일 -->
+    <link rel="stylesheet" href="global.css">
+    <link rel="stylesheet" href="stp_strategy.css">
+</head>
+<body class="page-stp">
+
+    <!-- ============================================================
+         Header
+         ============================================================ -->
+    <header class="app-header">
+        <div class="app-header__inner">
+            <div class="app-header__brand">
+                <div class="brand-group">
+                    <div class="logo-mark">
+                        <i class="fa-solid fa-crosshairs"></i>
+                    </div>
+                    <div>
+                        <div class="title-row">
+                            <h1 class="app-title">STP 전략 전후 비교</h1>
+                            <span class="pill-badge">Segmentation · Targeting · Positioning</span>
+                        </div>
+                        <p class="app-subtitle">가격 × 제품 모델 기준 · 한국 · 미국 · 중국 포지셔닝 변화 (전 → 후)</p>
+                    </div>
+                </div>
+
+                <button class="theme-toggle-mobile" onclick="toggleTheme()" aria-label="테마 전환">
+                    <i class="fa-solid fa-moon icon-moon"></i>
+                    <i class="fa-solid fa-sun icon-sun"></i>
+                </button>
+            </div>
+
+            <div class="header-controls">
+                <span class="draft-badge"><i class="fa-solid fa-flag"></i> 자사: B팀 · 후 가격은 제안가</span>
+                <button class="btn btn-secondary" onclick="window.print()" title="인쇄 / PDF 저장">
+                    <i class="fa-solid fa-print"></i>
+                </button>
+                <button class="theme-toggle" onclick="toggleTheme()" aria-label="테마 전환">
+                    <i class="fa-solid fa-moon icon-moon"></i>
+                    <i class="fa-solid fa-sun icon-sun"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================================
+         Main
+         ============================================================ -->
+    <main class="app-main">
+
+        <!-- ---------- 1. 시장별 포지션 이동 요약 ---------- -->
+        <section class="glass-panel panel">
+            <div class="panel__header">
+                <div>
+                    <h2 class="panel__title"><i class="fa-solid fa-route"></i> 시장별 포지션 이동 요약</h2>
+                    <p class="panel__desc">B팀 포지션이 어느 사분면에서 어느 사분면으로 이동하는지와 가격 변화를 비교합니다. 카드를 누르면 해당 시장으로 이동합니다.</p>
+                </div>
+            </div>
+            <div id="summaryGrid" class="summary-grid"></div>
+        </section>
+
+        <!-- ---------- 2. 시장 필터 + 범례 ---------- -->
+        <div class="toolbar">
+            <div id="marketTabs" class="tabs" role="tablist"></div>
+            <div class="legend">
+                <span class="legend__item"><span class="legend__dot legend__dot--self"></span>B팀 (자사)</span>
+                <span class="legend__item"><span class="legend__dot legend__dot--competitor"></span>경쟁팀 (A · C · D)</span>
+                <span class="legend__item"><span class="legend__dot legend__dot--ghost"></span>이전 포지션</span>
+                <span class="legend__item"><span class="legend__zone"></span>타겟 사분면</span>
+            </div>
+        </div>
+
+        <!-- ---------- 3. 시장별 전 → 후 비교 (JS 렌더링) ---------- -->
+        <div id="markets" class="markets"></div>
+
+    </main>
+
+    <footer class="app-footer">
+        출처: B2-4 제품 판매 가격 · B2-6 제품 모델 번호 — 후(後) 포지션의 B팀 가격은 제안값이며, 경쟁팀은 현재 값을 유지한다고 가정
+    </footer>
+
+    <script>
+        /* =============================================================
+           원천 데이터 — 사진 자료 (B2-4 판매 가격, B2-6 제품 모델 번호)
+           -------------------------------------------------------------
+           x축 = 판매 가격   (중심선 = 해당 시장 현재 평균)
+           y축 = 제품 모델 번호 (높을수록 우수, 중심선 = 4.5)
+           좌표(0~100)는 아래 값으로 자동 계산됩니다.
+           ============================================================= */
+        const SELF = 'B';
+        const TEAMS = ['A', 'B', 'C', 'D'];
+
+        // B2-6. 판매 제품 모델 / 출시 가능 제품 모델
+        const MODEL_NOW = { A: 5, B: 4, C: 4, D: 5 };
+        const MODEL_LAUNCHABLE = { A: 5, B: 4, C: 5, D: 5 };
+        const MODEL_CENTER = 4.5;
+        const MODEL_SPAN = 1.25;          // 중심 ± 1.25 → 모델 4 = 30, 모델 5 = 70
+
+        // 사분면: 1 우상 · 2 좌상 · 3 좌하 · 4 우하
+        const QUADRANTS = { 1: '프리미엄', 2: '가성비 우위', 3: '실속형', 4: '가격 열위' };
+        const QUADRANT_DESC = { 1: '고가 · 상위 모델', 2: '저가 · 상위 모델', 3: '저가 · 하위 모델', 4: '고가 · 하위 모델' };
+
+        const MARKETS = [
+            {
+                id: 'kr', code: 'KR', name: '한국', sub: 'Korea Market', unit: '원',
+                avg: 790700,                                         // 표의 평균값
+                prices: { A: 822800, B: 800000, C: 770000, D: 770000 },
+                after: { B: 760000 },                                // 제안가 (시장 최저가 −1% 수준)
+                text: {
+                    before: {
+                        segmentation: '가격(평균 790,700원 기준 고/저) × 모델(4/5)로 보면 Ⅰ 프리미엄은 A팀, Ⅱ 가성비 우위는 D팀, Ⅲ 실속형은 C팀이 차지. Ⅳ에는 B팀만 있음',
+                        targeting: '명시적 타겟 없음. 평균보다 높은 가격으로 사실상 고가 수요층을 노리지만, 그 수요는 모델 5를 가진 A팀이 흡수',
+                        positioning: '800,000원 · 모델 4. 평균보다 9,300원 비싸면서 모델은 하위라 가격과 성능 모두 내세울 점이 없음'
+                    },
+                    after: {
+                        segmentation: '같은 4분면 기준에서 출시 가능 모델이 4로 묶여 있어 상위 모델 세그먼트(Ⅰ·Ⅱ)는 진입 불가. 하위 모델 세그먼트 안에서 경쟁',
+                        targeting: 'Ⅲ 실속형: 가격에 민감하고 모델 4로 충분한 고객층. 현재 경쟁자는 C팀(770,000원) 하나',
+                        positioning: '760,000원 · 모델 4로 한국 시장 최저가. "같은 성능이라면 가장 합리적인 선택"'
+                    }
+                },
+                note: 'C팀은 모델 5 출시가 가능해 업그레이드하면 Ⅱ로 이동하고, B팀이 Ⅲ를 단독으로 점유할 수 있음. C팀이 가격 인하로 맞서면 가격 경쟁이 심해지므로 마진 하한 확인 필요'
+            },
+            {
+                id: 'us', code: 'US', name: '미국', sub: 'United States Market', unit: '달러',
+                avg: 737,
+                prices: { A: 774, B: 774, C: 700, D: 700 },
+                after: { B: 690 },
+                text: {
+                    before: {
+                        segmentation: '가격(평균 737달러 기준) × 모델로 보면 A팀 Ⅰ, D팀 Ⅱ, C팀 Ⅲ, B팀 Ⅳ. 가격대가 774달러와 700달러 두 덩어리로 나뉨',
+                        targeting: '고가(774달러) 수요층. 하지만 A팀이 같은 가격에 모델 5를 제공',
+                        positioning: '774달러 · 모델 4. 시장 최고가인데 모델은 A팀보다 한 단계 아래라 네 팀 중 가장 직접적으로 밀림'
+                    },
+                    after: {
+                        segmentation: '고가 덩어리(774달러)에서 이탈하고 저가 덩어리(700달러 이하)로 이동. 하위 모델 세그먼트에 집중',
+                        targeting: 'Ⅲ 실속형: 가격을 먼저 따지는 고객. C팀(700달러)과 직접 경쟁',
+                        positioning: '690달러 · 모델 4로 미국 시장 최저가. 700달러 선 아래의 유일한 제품'
+                    }
+                },
+                note: '인하 폭이 −10.9%로 세 시장 중 가장 큼. 원가·마진 확인이 필요하며, 부담되면 C·D와 같은 700달러로 맞추는 대안도 가능(이 경우 C팀과 동일 포지션)'
+            },
+            {
+                id: 'cn', code: 'CN', name: '중국', sub: 'China Market', unit: '위안',
+                avg: 4424,
+                prices: { A: 4598, B: 4500, C: 4200, D: 4400 },
+                after: { B: 4150 },
+                text: {
+                    before: {
+                        segmentation: '가격(평균 4,424위안 기준) × 모델로 보면 A팀 Ⅰ, D팀 Ⅱ, C팀 Ⅲ, B팀 Ⅳ. 네 팀 가격이 모두 달라 가격 차별이 가장 뚜렷한 시장',
+                        targeting: '평균 이상 가격대 수요층. D팀이 100위안 싸면서 모델 5를 제공해 열위',
+                        positioning: '4,500위안 · 모델 4. D팀(4,400위안·모델 5)보다 비싸고 사양은 낮음'
+                    },
+                    after: {
+                        segmentation: '하위 모델 세그먼트 중 최저가 구간을 선점. 상위 모델 세그먼트는 A·D팀에 양보',
+                        targeting: 'Ⅲ 실속형: 가격 중심 구매 고객. C팀(4,200위안)과 경쟁',
+                        positioning: '4,150위안 · 모델 4로 중국 시장 최저가. C팀보다 50위안 저렴'
+                    }
+                },
+                note: 'C팀과의 차이가 50위안으로 작음. C팀이 모델 5로 올라가면 Ⅲ 단독 점유, 그대로 남으면 소폭 가격 우위만 확보'
+            }
+        ];
+
+        const STP_ROWS = [
+            { key: 'S', field: 'segmentation', label: 'Segmentation · 시장 세분화' },
+            { key: 'T', field: 'targeting',    label: 'Targeting · 표적 시장' },
+            { key: 'P', field: 'positioning',  label: 'Positioning · 포지셔닝' }
+        ];
+        const romans = { 1: 'Ⅰ', 2: 'Ⅱ', 3: 'Ⅲ', 4: 'Ⅳ' };
+
+        /* ---------- 유틸 ---------- */
+        function esc(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+        const fmt = (n, unit) => n.toLocaleString('ko-KR') + unit;
+        const pct = (from, to) => ((to - from) / from * 100).toFixed(1);
+        const quadrantOf = p => (p.y >= 50 ? (p.x >= 50 ? 1 : 2) : (p.x >= 50 ? 4 : 3));
+
+        /* ---------- 좌표 계산 ---------- */
+        // 시장별 x 범위: 전·후 모든 가격의 평균 대비 최대 편차 × 1.6 (점이 가장자리·눈금 라벨에 붙지 않게)
+        function priceSpan(m) {
+            const all = [...Object.values(m.prices), ...Object.values(m.after)];
+            return Math.max(...all.map(v => Math.abs(v - m.avg))) * 1.6;
+        }
+        function buildPoints(m, phase) {
+            const span = priceSpan(m);
+            return TEAMS.map(t => {
+                const price = phase === 'after' && m.after[t] != null ? m.after[t] : m.prices[t];
+                const model = MODEL_NOW[t];
+                return {
+                    team: t, name: t + '팀', price, model, self: t === SELF,
+                    x: 50 + (price - m.avg) / span * 50,
+                    y: 50 + (model - MODEL_CENTER) / MODEL_SPAN * 50
+                };
+            });
+        }
+
+        /* ---------- 포지셔닝 맵 ---------- */
+        function renderMap(m, phase) {
+            const points = buildPoints(m, phase);
+            const self = points.find(p => p.self);
+            const ghost = phase === 'after' ? buildPoints(m, 'before').find(p => p.self) : null;
+            const target = quadrantOf(self);
+
+            const quadHTML = [2, 1, 3, 4].map(q => `
+                <div class="pmap__quad${target === q ? ' is-target' : ''}" data-q="${q}">
+                    <span><span class="pmap__quad-no">${romans[q]}</span>${QUADRANTS[q]}</span>
+                </div>`).join('');
+
+            // 이전 → 현재 이동 곡선 (모델이 같아 수평 이동이므로 아래로 휘게 해 경쟁팀 점을 피함)
+            let svg = '', ghostHTML = '';
+            if (ghost) {
+                const x1 = ghost.x, y1 = 100 - ghost.y, x2 = self.x, y2 = 100 - self.y;
+                const len = Math.hypot(x2 - x1, y2 - y1);
+                if (len > 6) {
+                    let nx = -(y2 - y1) / len, ny = (x2 - x1) / len;   // 수직 방향
+                    if (ny < 0) { nx = -nx; ny = -ny; }                  // 항상 아래쪽(svg y+)으로
+                    const bow = Math.min(len * 0.5, 26);
+                    const cx = (x1 + x2) / 2 + nx * bow, cy = (y1 + y2) / 2 + ny * bow;
+                    const unit = (ax, ay, bx, by) => { const d = Math.hypot(bx - ax, by - ay); return [(bx - ax) / d, (by - ay) / d]; };
+                    const [sux, suy] = unit(x1, y1, cx, cy);
+                    const [eux, euy] = unit(x2, y2, cx, cy);
+                    const sx = x1 + sux * 3, sy = y1 + suy * 3;
+                    const ex = x2 + eux * 4, ey = y2 + euy * 4;              // 자사 점 앞에서 멈춤
+                    const h = 3.2, w = 1.9;
+                    const [dux, duy] = unit(cx, cy, ex, ey);                 // 끝점 접선 방향
+                    const bx = ex - dux * h, by = ey - duy * h;
+                    svg = `<svg class="pmap__svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                        <path class="pmap__move" d="M ${sx} ${sy} Q ${cx} ${cy} ${bx} ${by}"></path>
+                        <polygon class="pmap__move-head" points="${ex},${ey} ${bx - duy * w},${by + dux * w} ${bx + duy * w},${by - dux * w}"></polygon>
+                    </svg>`;
+                }
+                ghostHTML = `
+                    <div class="pmap__point pmap__point--ghost" style="left:${ghost.x}%;bottom:${ghost.y}%" title="이전: ${esc(fmt(ghost.price, m.unit))}">
+                        <span class="pmap__dot"></span><span class="pmap__label">이전 ${esc(fmt(ghost.price, m.unit))}</span>
+                    </div>`;
+            }
+
+            const pointHTML = points.map(p => `
+                <div class="pmap__point${p.self ? ' pmap__point--self' : ''}" style="left:${p.x}%;bottom:${p.y}%"
+                     title="${esc(p.name)} · ${esc(fmt(p.price, m.unit))} · 모델 ${p.model}">
+                    <span class="pmap__dot"></span><span class="pmap__label">${esc(p.name)}${p.self ? ' · 우리' : ''}</span>
+                </div>`).join('');
+
+            const yTick = model => `<span class="pmap__tick" style="bottom:${50 + (model - MODEL_CENTER) / MODEL_SPAN * 50}%">모델 ${model}</span>`;
+
+            return `
+                <div class="pmap">
+                    <div class="pmap__ytitle">제품 모델 번호 (높을수록 우수)</div>
+                    <div class="pmap__plot">
+                        <div class="pmap__quads">${quadHTML}</div>
+                        <div class="pmap__guide" style="bottom:70%"></div>
+                        <div class="pmap__guide" style="bottom:30%"></div>
+                        <div class="pmap__axis pmap__axis--x"></div>
+                        <div class="pmap__axis pmap__axis--y"></div>
+                        ${yTick(5)}${yTick(4)}
+                        <span class="pmap__end pmap__end--xmin">← 저가</span>
+                        <span class="pmap__end pmap__end--xmax">고가 →</span>
+                        <span class="pmap__end pmap__end--ymax">↑ 상위 모델</span>
+                        <span class="pmap__end pmap__end--ymin">↓ 하위 모델</span>
+                        ${svg}${ghostHTML}${pointHTML}
+                    </div>
+                    <div class="pmap__xtitle">판매 가격 (중심선 = 현재 평균 ${esc(fmt(m.avg, m.unit))})</div>
+                </div>`;
+        }
+
+        /* ---------- 근거 데이터 표 ---------- */
+        function renderTable(m, phase) {
+            const before = buildPoints(m, 'before');
+            const rows = buildPoints(m, phase).map((p, i) => {
+                const changed = p.price !== before[i].price;
+                const price = changed
+                    ? `<span class="ptable__from">${esc(fmt(before[i].price, m.unit))}</span> → <strong>${esc(fmt(p.price, m.unit))}</strong> <span class="ptable__delta">${pct(before[i].price, p.price)}%</span>`
+                    : esc(fmt(p.price, m.unit));
+                return `
+                    <tr class="${p.self ? 'is-self' : ''}">
+                        <td>${esc(p.name)}${p.self ? ' <span class="ptable__me">우리</span>' : ''}</td>
+                        <td class="num">${price}</td>
+                        <td class="num">${p.model}<span class="ptable__sub"> / 출시가능 ${MODEL_LAUNCHABLE[p.team]}</span></td>
+                        <td>${romans[quadrantOf(p)]} ${QUADRANTS[quadrantOf(p)]}</td>
+                    </tr>`;
+            }).join('');
+            return `
+                <div class="ptable-wrap">
+                    <table class="ptable">
+                        <thead><tr><th>팀</th><th class="num">판매 가격</th><th class="num">모델</th><th>사분면</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>`;
+        }
+
+        /* ---------- STP 카드 (전 / 후) ---------- */
+        function renderCard(m, kind) {
+            const isAfter = kind === 'after';
+            const text = m.text[kind];
+            const rows = STP_ROWS.map(r => `
+                <div class="stp-row">
+                    <span class="stp-row__key">${r.key}</span>
+                    <div>
+                        <div class="stp-row__label">${r.label}</div>
+                        <div class="stp-row__text">${esc(text[r.field])}</div>
+                    </div>
+                </div>`).join('');
+
+            return `
+                <article class="glass-panel stp-card stp-card--${kind}">
+                    <div class="stp-card__header">
+                        <span class="phase-tag phase-tag--${kind}">
+                            <i class="fa-solid ${isAfter ? 'fa-flag-checkered' : 'fa-clock-rotate-left'}"></i>
+                            ${isAfter ? 'AFTER · 후' : 'BEFORE · 전'}
+                        </span>
+                        <span class="stp-card__period">${isAfter ? '제안 전략' : '현재 (B2-4 · B2-6)'}</span>
+                    </div>
+                    <div class="stp-rows">${rows}</div>
+                    ${renderMap(m, kind)}
+                    ${renderTable(m, kind)}
+                </article>`;
+        }
+
+        /* ---------- 변화 포인트 ---------- */
+        function renderChanges(m) {
+            const b = buildPoints(m, 'before').find(p => p.self);
+            const a = buildPoints(m, 'after').find(p => p.self);
+            const qb = quadrantOf(b), qa = quadrantOf(a);
+            const items = [
+                { key: 'Segmentation', from: '세분화 없이 평균 이상 가격 책정', to: '가격 × 모델 4분면 중 하위 모델 세그먼트 집중' },
+                { key: 'Targeting', from: `${romans[qb]} ${QUADRANTS[qb]} (${QUADRANT_DESC[qb]})`, to: `${romans[qa]} ${QUADRANTS[qa]} (${QUADRANT_DESC[qa]})` },
+                { key: 'Positioning', from: `${fmt(b.price, m.unit)} · 모델 ${b.model}`, to: `${fmt(a.price, m.unit)} · 모델 ${a.model} (${pct(b.price, a.price)}%)` }
+            ];
+            return `
+                <div class="glass-panel changes">
+                    <div class="changes__title"><i class="fa-solid fa-shuffle"></i>핵심 변화 포인트</div>
+                    <ul class="changes__list">${items.map(c => `
+                        <li class="change">
+                            <span class="change__key">${esc(c.key)}</span>
+                            <span class="change__flow">
+                                <span class="change__from">${esc(c.from)}</span>
+                                <i class="fa-solid fa-arrow-right"></i>
+                                <span class="change__to">${esc(c.to)}</span>
+                            </span>
+                        </li>`).join('')}
+                    </ul>
+                    <p class="changes__note"><i class="fa-solid fa-triangle-exclamation"></i>${esc(m.note)}</p>
+                </div>`;
+        }
+
+        /* ---------- 시장 섹션 ---------- */
+        function renderMarkets() {
+            document.getElementById('markets').innerHTML = MARKETS.map(m => `
+                <section id="market-${m.id}" class="market mk--${m.id}" data-market="${m.id}">
+                    <div class="market__header">
+                        <div class="market__title">
+                            <span class="mk-code">${esc(m.code)}</span>
+                            <div>
+                                <h2 class="market__name">${esc(m.name)} 시장</h2>
+                                <p class="market__sub">${esc(m.sub)} · 단위 ${esc(m.unit)} · 평균 ${esc(fmt(m.avg, m.unit))}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="compare">
+                        ${renderCard(m, 'before')}
+                        <div class="compare__arrow" aria-hidden="true"><span><i class="fa-solid fa-arrow-right"></i></span></div>
+                        ${renderCard(m, 'after')}
+                    </div>
+                    ${renderChanges(m)}
+                </section>`).join('');
+        }
+
+        /* ---------- 요약 카드 ---------- */
+        function renderSummary() {
+            document.getElementById('summaryGrid').innerHTML = MARKETS.map(m => {
+                const b = buildPoints(m, 'before').find(p => p.self);
+                const a = buildPoints(m, 'after').find(p => p.self);
+                const q = p => `${romans[quadrantOf(p)]} ${QUADRANTS[quadrantOf(p)]}`;
+                return `
+                    <button class="summary-card mk--${m.id}" onclick="focusMarket('${m.id}')">
+                        <span class="summary-card__top">
+                            <span class="summary-card__name"><span class="mk-code">${esc(m.code)}</span>${esc(m.name)}</span>
+                            <span class="summary-card__delta">${pct(b.price, a.price)}%</span>
+                        </span>
+                        <span class="summary-card__move">
+                            <span><span class="summary-card__label">전</span><br><span class="summary-card__value">${q(b)}</span><br><span class="summary-card__price">${esc(fmt(b.price, m.unit))}</span></span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                            <span><span class="summary-card__label">후</span><br><span class="summary-card__value summary-card__value--after">${q(a)}</span><br><span class="summary-card__price">${esc(fmt(a.price, m.unit))}</span></span>
+                        </span>
+                    </button>`;
+            }).join('');
+        }
+
+        /* ---------- 시장 필터 탭 ---------- */
+        let activeMarket = 'all';
+        function renderTabs() {
+            const tabs = [{ id: 'all', name: '전체', code: '' }, ...MARKETS];
+            document.getElementById('marketTabs').innerHTML = tabs.map(t => `
+                <button class="tab${t.id === activeMarket ? ' is-active' : ''}" role="tab"
+                        aria-selected="${t.id === activeMarket}" onclick="setMarket('${t.id}')">
+                    ${t.code ? `<span class="tab__code">${esc(t.code)}</span>` : '<i class="fa-solid fa-earth-asia"></i>'}${esc(t.name)}
+                </button>`).join('');
+        }
+        function setMarket(id) {
+            activeMarket = id;
+            renderTabs();
+            document.querySelectorAll('.market').forEach(el => {
+                el.classList.toggle('hidden', id !== 'all' && el.dataset.market !== id);
+            });
+        }
+        function focusMarket(id) {
+            if (activeMarket !== 'all' && activeMarket !== id) setMarket(id);
+            document.getElementById('market-' + id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            try { localStorage.setItem('stp-theme', isDark ? 'dark' : 'light'); } catch (e) {}
+        }
+
+        renderSummary();
+        renderTabs();
+        renderMarkets();
+    </script>
+</body>
+</html>

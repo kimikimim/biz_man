@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4P Mix 마케팅 전략 수립 도구</title>
+
+    <!-- 테마 깜빡임 방지 + 허브 임베드 감지
+         테마 우선순위: 허브가 넘긴 ?theme= → 저장된 테마 → OS 설정
+         허브(index.html) 안에서 열리면 html.is-embedded → 로고·테마 버튼·푸터 숨김 -->
+    <script>
+        (function () {
+            const root = document.documentElement;
+            const params = new URLSearchParams(location.search);
+            let saved = null;
+            try { saved = localStorage.getItem('4p-theme'); } catch (e) {}
+            const fromHub = params.get('theme');
+            const dark = fromHub ? fromHub === 'dark'
+                : saved ? saved === 'dark'
+                : window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (dark) root.classList.add('dark');
+
+            if (window.self !== window.top || params.has('embed')) root.classList.add('is-embedded');
+
+            // 허브에서 테마를 바꾸면 따라감
+            window.addEventListener('message', e => {
+                if (e.source === window.parent && e.data && e.data.type === 'hub-theme') {
+                    root.classList.toggle('dark', !!e.data.dark);
+                }
+            });
+        })();
+    </script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 공통 디자인 시스템 + 페이지 전용 스타일 -->
+    <link rel="stylesheet" href="global.css">
+    <link rel="stylesheet" href="4p_mix_strategy.css">
+</head>
+<body class="page-4p">
+
+    <!-- ============================================================
+         Header
+         ============================================================ -->
+    <header class="app-header">
+        <div class="app-header__inner">
+            <div class="app-header__brand">
+                <div class="brand-group">
+                    <div class="logo-mark">
+                        <i class="fa-solid fa-chart-pie"></i>
+                    </div>
+                    <div>
+                        <div class="title-row">
+                            <h1 class="app-title">4P Mix Strategy Builder</h1>
+                            <span class="pill-badge">Marketing Mix</span>
+                        </div>
+                        <p class="app-subtitle">마케팅 믹스 전략 수립 &amp; 내보내기 도구</p>
+                    </div>
+                </div>
+
+                <!-- Mobile Theme Toggle -->
+                <button class="theme-toggle-mobile" onclick="toggleTheme()" aria-label="테마 전환">
+                    <i class="fa-solid fa-moon icon-moon"></i>
+                    <i class="fa-solid fa-sun icon-sun"></i>
+                </button>
+            </div>
+
+            <!-- Global Action Toolbar -->
+            <div class="header-controls">
+                <button onclick="loadSampleData('startup')" class="btn btn-ghost hide-mobile">
+                    <i class="fa-solid fa-lightbulb"></i> 예시 불러오기
+                </button>
+                <button onclick="clearAllFields()" class="btn btn-ghost btn-ghost--danger hide-mobile">
+                    <i class="fa-solid fa-rotate-left"></i> 초기화
+                </button>
+
+                <div class="toolbar-divider"></div>
+
+                <button onclick="exportAsHTML()" class="btn btn-primary btn-export">
+                    <i class="fa-solid fa-file-code"></i> HTML 저장
+                </button>
+                <button onclick="exportAsMarkdown()" class="btn btn-success btn-export">
+                    <i class="fa-solid fa-file-lines"></i> 마크다운 저장
+                </button>
+
+                <button class="theme-toggle" onclick="toggleTheme()" aria-label="테마 전환">
+                    <i class="fa-solid fa-moon icon-moon"></i>
+                    <i class="fa-solid fa-sun icon-sun"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================================
+         Main
+         ============================================================ -->
+    <main class="app-main">
+
+        <!-- Notification Toast -->
+        <div id="toast" class="toast" role="status" aria-live="polite">
+            <i id="toast-icon" class="fa-solid fa-circle-check toast__icon--success"></i>
+            <span id="toast-message">안내 메시지</span>
+        </div>
+
+        <!-- ---------- 1. 프로젝트 기본 정보 ---------- -->
+        <section class="glass-panel panel panel--meta">
+            <div class="panel__header">
+                <div>
+                    <h2 class="panel__title">
+                        <i class="fa-solid fa-folder-open"></i> 프로젝트 기본 정보
+                    </h2>
+                    <p class="panel__desc">보고서 머리말과 내보내기 파일명에 사용됩니다.</p>
+                </div>
+                <div class="panel__actions">
+                    <button onclick="triggerJSONImport()" class="btn-link">
+                        <i class="fa-solid fa-upload"></i>JSON 불러오기
+                    </button>
+                    <input type="file" id="jsonFileInput" accept=".json" class="hidden" onchange="importJSON(event)">
+                    <button onclick="exportAsJSON()" class="btn-link">
+                        <i class="fa-solid fa-download"></i>JSON 백업
+                    </button>
+                </div>
+            </div>
+
+            <div class="meta-grid">
+                <div class="field">
+                    <label class="form-label" for="meta-title"><span><i class="fa-solid fa-tag field__icon"></i>브랜드 / 제품명</span></label>
+                    <input type="text" id="meta-title" placeholder="예: 루시드 타임 스케줄러" class="input">
+                </div>
+                <div class="field">
+                    <label class="form-label" for="meta-target"><span><i class="fa-solid fa-user-group field__icon"></i>핵심 타겟 고객</span></label>
+                    <input type="text" id="meta-target" placeholder="예: 2030 생산성 지향 직장인" class="input">
+                </div>
+                <div class="field">
+                    <label class="form-label" for="meta-author"><span><i class="fa-solid fa-pen field__icon"></i>작성자 / 팀명</span></label>
+                    <input type="text" id="meta-author" placeholder="예: 마케팅 전략팀" class="input">
+                </div>
+                <div class="field">
+                    <label class="form-label" for="meta-date"><span><i class="fa-solid fa-calendar field__icon"></i>수립 일자</span></label>
+                    <input type="date" id="meta-date" class="input">
+                </div>
+                <div class="field meta-grid__full">
+                    <label class="form-label" for="meta-summary"><span><i class="fa-solid fa-bullseye field__icon"></i>전략 요약 및 비전</span></label>
+                    <input type="text" id="meta-summary" placeholder="전체적인 마케팅 믹스 전략의 핵심 포인트를 한 문장으로 요약하세요." class="input">
+                </div>
+            </div>
+        </section>
+
+        <!-- ---------- 2. 뷰 탭 & P별 진행률 ---------- -->
+        <div class="view-bar">
+            <div class="tabs" role="tablist">
+                <button id="tab-btn-form" onclick="switchView('form')" class="tab is-active" role="tab" aria-selected="true">
+                    <i class="fa-solid fa-pen-to-square"></i> 상세 입력 모드
+                </button>
+                <button id="tab-btn-matrix" onclick="switchView('matrix')" class="tab" role="tab" aria-selected="false">
+                    <i class="fa-solid fa-table-cells-large"></i> 2x2 매트릭스 뷰
+                </button>
+            </div>
+            <div class="progress">
+                <span>작성 진행률</span>
+                <div class="progress__track" title="Product · Price · Place · Promotion">
+                    <div class="progress__seg p--product"><span class="progress__fill" data-progress="p1"></span></div>
+                    <div class="progress__seg p--price"><span class="progress__fill" data-progress="p2"></span></div>
+                    <div class="progress__seg p--place"><span class="progress__fill" data-progress="p3"></span></div>
+                    <div class="progress__seg p--promotion"><span class="progress__fill" data-progress="p4"></span></div>
+                </div>
+                <span id="progress-percent" class="progress__percent">0%</span>
+            </div>
+        </div>
+
+        <!-- ---------- 3. 상세 입력 뷰 ---------- -->
+        <div id="view-form" class="p-grid">
+
+            <!-- 1P. PRODUCT -->
+            <section class="glass-panel p-card p--product">
+                <div class="p-card__header">
+                    <div class="p-card__heading">
+                        <span class="p-badge">1P</span>
+                        <div>
+                            <h3 class="p-card__title">Product (제품 / 서비스)</h3>
+                            <p class="p-card__question">무엇을 제공하여 고객의 문제를 해결할 것인가?</p>
+                        </div>
+                    </div>
+                    <div class="p-card__status">
+                        <span class="p-count" data-count="p1">0 / 3</span>
+                        <i class="fa-solid fa-box-open p-card__icon"></i>
+                    </div>
+                </div>
+                <div class="p-card__body">
+                    <div class="p-item">
+                        <label class="p-item__label" for="p1-features">
+                            <span class="p-item__name"><span class="p-item__no">1.1</span>핵심 기능 및 가치 <span class="p-item__en">Core Features &amp; Value</span></span>
+                            <span class="field__hint field__hint--required">필수</span>
+                        </label>
+                        <textarea id="p1-features" rows="3" placeholder="• 핵심 기능 1&#10;• 핵심 기능 2&#10;• 해결하고자 하는 고객 불편점" class="p-input custom-scrollbar"></textarea>
+                    </div>
+                    <div class="p-item">
+                        <label class="p-item__label" for="p1-usp">
+                            <span class="p-item__name"><span class="p-item__no">1.2</span>차별화 포인트 <span class="p-item__en">USP / Branding</span></span>
+                        </label>
+                        <textarea id="p1-usp" rows="2" placeholder="경쟁사 대비 특출난 강점, 브랜딩 컨셉, 패키징 특성 등" class="p-input custom-scrollbar"></textarea>
+                    </div>
+                    <div class="p-item">
+                        <label class="p-item__label" for="p1-service">
+                            <span class="p-item__name"><span class="p-item__no">1.3</span>품질 &amp; 고객지원 <span class="p-item__en">Quality &amp; Service</span></span>
+                        </label>
+                        <textarea id="p1-service" rows="2" placeholder="보증 기간, A/S 정책, 품질 보증 기준, 업데이트 주기" class="p-input custom-scrollbar"></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2P. PRICE -->
+            <section class="glass-panel p-card p--price">
+                <div class="p-card__header">
+                    <div class="p-card__heading">
+                        <span class="p-badge">2P</span>
+                        <div>
+                            <h3 class="p-card__title">Price (가격)</h3>
+                            <p class="p-card__question">얼마에 판매하며 고객이 느끼는 가치는 얼마인가?</p>
+                        </div>
+                    </div>
+                    <div class="p-card__status">
+                        <span class="p-count" data-count="p2">0 / 3</span>
+                        <i class="fa-solid fa-tags p-card__icon"></i>
+                    </div>
+                </div>
+                <div class="p-card__body">
+                    <div class="p-item">
+                        <label class="p-item__label" for="p2-strategy">
+                            <span class="p-item__name"><span class="p-item__no">2.1</span>가격 책정 전략 <span class="p-item__en">Pricing Strategy</span></span>
+                            <span class="field__hint field__hint--required">필수</span>
+                        </label>
+                        <textarea id="p2-strategy" rows="3" placeholder="• 침투 가격 전략 / 가치 기반 가격 책정 / 구독 모델 등&#10;• 기본 요금 체계 및 티어별 금액 설정" class="p-input custom-scrollbar"></textarea>
+                    </div>
+                    <div class="p-item">
+                        <label class="p-item__label" for="p2-discounts">
+                            <span class="p-item__name"><span class="p-item__no">2.2</span>할인 및 혜택 정책 <span class="p-item__en">Discounts &amp; Terms</span></span>
+                        </label>
+                        <textarea id="p2-discounts" rows="2" placeholder="연간 결제 할인, 신규 가입 혜택, 대량 구매 프로모션 등" class="p-input custom-scrollbar"></textarea>
+                    </div>
+                    <div class="p-item">
+                        <label class="p-item__label" for="p2-value">
+                            <span class="p-item__name"><span class="p-item__no">2.3</span>지불 방식 &amp; 가치 제안 <span class="p-item__en">Payment &amp; Perceived Value</span></span>
+                        </label>
+                        <textarea id="p2-value" rows="2" placeholder="신용카드, 간편결제, 분할납부 / 고객이 체감하는 비용 대비 효율성" class="p-input custom-scrollbar"></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3P. PLACE -->
+            <section class="glass-panel p-card p--place">
+                <div class="p-card__header">
+                    <div class="p-card__heading">
+                        <span class="p-badge">3P</span>
+                        <div>
+                            <h3 class="p-card__title">Place (유통 / 판매 경로)</h3>
+                            <p class="p-card__question">고객이 제품을 어디서 구매하고 접하는가?</p>
+                        </div>
+                    </div>
+                    <div class="p-card__status">
+                        <span class="p-count" data-count="p3">0 / 3</span>
+                        <i class="fa-solid fa-store p-card__icon"></i>
+                    </div>
+                </div>
+                <div class="p-card__body">
+                    <div class="p-item">
+                        <label class="p-item__label" for="p3-channels">
+                            <span class="p-item__name"><span class="p-item__no">3.1</span>주요 판매 채널 <span class="p-item__en">Channels</span></span>
+                            <span class="field__hint field__hint--required">필수</span>
+                        </label>
+                        <textarea id="p3-channels" rows="3" placeholder="• 자사 공식 웹사이트 / 자사몰 D2C&#10;• 오픈마켓(쿠팡, 네이버 스마트스토어)&#10;• 오프라인 팝업스토어 / 입점 매장" class="p-input custom-scrollbar"></textarea>
+                    </div>
+                    <div class="p-item">
+                        <label class="p-item__label" for="p3-logistics">
+                            <span class="p-item__name"><span class="p-item__no">3.2</span>물류 &amp; 배송 전략 <span class="p-item__en">Logistics &amp; Delivery</span></span>
+                        </label>
+                        <textarea id="p3-logistics" rows="2" placeholder="당일 배송, 새벽 배송 파트너십, 글로벌 직배송, 재고 관리 방식" class="p-input custom-scrollbar"></textarea>
+                    </div>
+                    <div class="p-item">
+                        <label class="p-item__label" for="p3-partners">
+                            <span class="p-item__name"><span class="p-item__no">3.3</span>커버리지 &amp; 파트너십 <span class="p-item__en">Coverage &amp; Partners</span></span>
+                        </label>
+                        <textarea id="p3-partners" rows="2" placeholder="지역 커버리지, 유통 총판 계약, 리셀러 파트너십 유무" class="p-input custom-scrollbar"></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4P. PROMOTION -->
+            <section class="glass-panel p-card p--promotion">
+                <div class="p-card__header">
+                    <div class="p-card__heading">
+                        <span class="p-badge">4P</span>
+                        <div>
+                            <h3 class="p-card__title">Promotion (판촉 / 홍보)</h3>
+                            <p class="p-card__question">어떻게 알리고 고객의 구매 욕구를 자극할 것인가?</p>
+                        </div>
+                    </div>
+                    <div class="p-card__status">
+                        <span class="p-count" data-count="p4">0 / 3</span>
+                        <i class="fa-solid fa-bullhorn p-card__icon"></i>
+                    </div>
+                </div>
+                <div class="p-card__body">
+                    <div class="p-item">
+                        <label class="p-item__label" for="p4-advertising">
+                            <span class="p-item__name"><span class="p-item__no">4.1</span>광고 및 퍼포먼스 마케팅 <span class="p-item__en">Advertising &amp; Digital</span></span>
+                            <span class="field__hint field__hint--required">필수</span>
+                        </label>
+                        <textarea id="p4-advertising" rows="3" placeholder="• SNS 매체 광고 (Instagram, YouTube, TikTok)&#10;• 검색 광고 (SA) 및 콘텐츠 SEO 타겟팅&#10;• 인플루언서 협찬 마케팅" class="p-input custom-scrollbar"></textarea>
+                    </div>
+                    <div class="p-item">
+                        <label class="p-item__label" for="p4-events">
+                            <span class="p-item__name"><span class="p-item__no">4.2</span>프로모션 &amp; 이벤트 <span class="p-item__en">Sales Promotion &amp; PR</span></span>
+                        </label>
+                        <textarea id="p4-events" rows="2" placeholder="런칭 기념 할인, 체험단 운영, 바이럴 챌린지, 언론 보도 자료" class="p-input custom-scrollbar"></textarea>
+                    </div>
+                    <div class="p-item">
+                        <label class="p-item__label" for="p4-message">
+                            <span class="p-item__name"><span class="p-item__no">4.3</span>핵심 메시지 <span class="p-item__en">Key Message / CTA</span></span>
+                        </label>
+                        <textarea id="p4-message" rows="2" placeholder="슬로건, 메인 카피라이팅, 고객행동유도(CTA) 문구" class="p-input custom-scrollbar"></textarea>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- ---------- 4. 2x2 매트릭스 뷰 ---------- -->
+        <div id="view-matrix" class="matrix hidden">
+
+            <!-- 보고서 헤더 -->
+            <div class="matrix-hero">
+                <div class="matrix-hero__glow"></div>
+                <div class="matrix-hero__watermark">4P</div>
+                <div class="matrix-hero__inner">
+                    <div class="matrix-hero__top">
+                        <div>
+                            <p class="matrix-hero__eyebrow">4P Marketing Mix Report</p>
+                            <span id="matrix-header-title" class="matrix-hero__title">전략 보고서 대시보드</span>
+                        </div>
+                        <span id="matrix-header-date" class="matrix-hero__date">YYYY-MM-DD</span>
+                    </div>
+                    <p id="matrix-header-target" class="matrix-hero__target">타겟: 입력 대기 중</p>
+                    <p id="matrix-header-summary" class="matrix-hero__summary">전략 요약 문구가 여기에 표시됩니다.</p>
+
+                    <!-- P별 작성 현황 -->
+                    <div class="matrix-hero__stats">
+                        <div class="hero-stat p--product"><span class="hero-stat__name"><span class="hero-stat__dot"></span>Product</span><span class="hero-stat__value" data-stat="p1">0 / 3</span></div>
+                        <div class="hero-stat p--price"><span class="hero-stat__name"><span class="hero-stat__dot"></span>Price</span><span class="hero-stat__value" data-stat="p2">0 / 3</span></div>
+                        <div class="hero-stat p--place"><span class="hero-stat__name"><span class="hero-stat__dot"></span>Place</span><span class="hero-stat__value" data-stat="p3">0 / 3</span></div>
+                        <div class="hero-stat p--promotion"><span class="hero-stat__name"><span class="hero-stat__dot"></span>Promotion</span><span class="hero-stat__value" data-stat="p4">0 / 3</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2x2 Grid -->
+            <div class="matrix-grid">
+
+                <!-- P1 -->
+                <section class="glass-panel m-card p--product">
+                    <div class="m-card__header">
+                        <span class="m-card__title"><i class="fa-solid fa-box-open"></i> PRODUCT</span>
+                        <div class="m-card__meta">
+                            <span class="m-card__sub">제품 / 서비스</span>
+                            <span class="state-badge" data-state="p1">미착수</span>
+                        </div>
+                    </div>
+                    <div class="m-card__body">
+                        <div>
+                            <span class="m-item__label"><span class="p-item__no">1.1</span>핵심 기능 &amp; 가치</span>
+                            <div id="m-p1-features" class="m-value is-empty">미입력</div>
+                        </div>
+                        <div>
+                            <span class="m-item__label"><span class="p-item__no">1.2</span>USP &amp; 브랜딩</span>
+                            <div id="m-p1-usp" class="m-value is-empty">미입력</div>
+                        </div>
+                        <div>
+                            <span class="m-item__label"><span class="p-item__no">1.3</span>품질 &amp; A/S</span>
+                            <div id="m-p1-service" class="m-value is-empty">미입력</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- P2 -->
+                <section class="glass-panel m-card p--price">
+                    <div class="m-card__header">
+                        <span class="m-card__title"><i class="fa-solid fa-tags"></i> PRICE</span>
+                        <div class="m-card__meta">
+                            <span class="m-card__sub">가격 전략</span>
+                            <span class="state-badge" data-state="p2">미착수</span>
+                        </div>
+                    </div>
+                    <div class="m-card__body">
+                        <div>
+                            <span class="m-item__label"><span class="p-item__no">2.1</span>가격 정책 &amp; 티어</span>
+                            <div id="m-p2-strategy" class="m-value is-empty">미입력</div>
+                        </div>
+                        <div>
+                            <span class="m-item__label"><span class="p-item__no">2.2</span>할인 및 혜택</span>
+                            <div id="m-p2-discounts" class="m-value is-empty">미입력</div>
+                        </div>
+                        <div>
+                            <span class="m-item__label"><span class="p-item__no">2.3</span>결제 수단 &amp; 가치</span>
+                            <div id="m-p2-value" class="m-value is-empty">미입력</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- P3 -->
+                <section class="glass-panel m-card p--place">
+                    <div class="m-card__header">
+                        <span class="m-card__title"><i class="fa-solid fa-store"></i> PLACE</span>
+                        <div class="m-card__meta">
+                            <span class="m-card__sub">유통 / 판매 경로</span>
+                            <span class="state-badge" data-state="p3">미착수</span>
+                        </div>
+                    </div>
+                    <div class="m-card__body">
+                        <div>
+                            <span class="m-item__label"><span class="p-item__no">3.1</span>주요 채널</span>
+                            <div id="m-p3-channels" class="m-value is-empty">미입력</div>
+                        </div>
+                        <div>
+                            <span class="m-item__label"><span class="p-item__no">3.2</span>물류 &amp; 배송</span>
+                            <div id="m-p3-logistics" class="m-value is-empty">미입력</div>
+                        </div>
+                        <div>
+                            <span class="m-item__label"><span class="p-item__no">3.3</span>파트너십</span>
+                            <div id="m-p3-partners" class="m-value is-empty">미입력</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- P4 -->
+                <section class="glass-panel m-card p--promotion">
+                    <div class="m-card__header">
+                        <span class="m-card__title"><i class="fa-solid fa-bullhorn"></i> PROMOTION</span>
+                        <div class="m-card__meta">
+                            <span class="m-card__sub">판촉 / 홍보</span>
+                            <span class="state-badge" data-state="p4">미착수</span>
+                        </div>
+                    </div>
+                    <div class="m-card__body">
+                        <div>
+                            <span class="m-item__label"><span class="p-item__no">4.1</span>광고 &amp; 디지털</span>
+                            <div id="m-p4-advertising" class="m-value is-empty">미입력</div>
+                        </div>
+                        <div>
+                            <span class="m-item__label"><span class="p-item__no">4.2</span>프로모션 &amp; PR</span>
+                            <div id="m-p4-events" class="m-value is-empty">미입력</div>
+                        </div>
+                        <div>
+                            <span class="m-item__label"><span class="p-item__no">4.3</span>핵심 메시지</span>
+                            <div id="m-p4-message" class="m-value is-empty">미입력</div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <i class="fa-solid fa-shield-halved"></i>4P Mix Strategy Builder — 브라우저 내에서 안전하게 작동하며 데이터는 외부 서버에 보관되지 않습니다.
+    </footer>
+
+    <script>
+        // Utility elements
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+        const toastIcon = document.getElementById('toast-icon');
+
+        // Input field keys
+        const metaFields = ['meta-title', 'meta-target', 'meta-author', 'meta-date', 'meta-summary'];
+        const pFields = [
+            'p1-features', 'p1-usp', 'p1-service',
+            'p2-strategy', 'p2-discounts', 'p2-value',
+            'p3-channels', 'p3-logistics', 'p3-partners',
+            'p4-advertising', 'p4-events', 'p4-message'
+        ];
+
+        // Sample preset data
+        const sampleData = {
+            'meta-title': '프리미엄 로스터리 스페셜티 커피 (Brew & Co.)',
+            'meta-target': '20-40대 가치소비형 직장인 & 커피 에피큐리언',
+            'meta-author': '브랜드 전략팀',
+            'meta-date': new Date().toISOString().split('T')[0],
+            'meta-summary': '최상급 싱글오리진 원두와 산지 직송 가치를 바탕으로 프리미엄 홈카페 경험과 도심 속 오프라인 휴식 공간을 제공하는 옴니채널 마케팅 전략',
+            
+            // Product
+            'p1-features': '• 100% 공정무역 스페셜티 싱글 오리진 원두\n• 개별 질소 포장으로 6개월 신선도 유지 드립백\n• 취향별 구독 맞춤 큐레이션 서비스',
+            'p1-usp': '구독 고객 전용 바리스타 라운지 무료 이용권 제공 & 당일 로스팅 당일 발송 보장',
+            'p1-service': '원두 맛 불만족 시 100% 무료 교환제, 정기구독자 전용 1:1 홈카페 컨설팅',
+
+            // Price
+            'p2-strategy': '• 프리미엄 가격 전략 (시중 원두 대비 15~20% 우상향 가격 설정)\n• 정기 구독 모델: 월 29,900원 (20% 할인 효과 및 무료 배송)',
+            'p2-discounts': '첫 구독 신청 시 에스프레소 잔 증정, 친구 추천 시 상호 5,000원 할인 쿠폰',
+            'p2-value': '간편 결제(카카오페이, 네이버페이, 정기 자동결제), 스탬프 적립 리워드',
+
+            // Place
+            'p3-channels': '• 온라인: 자사 D2C 쇼핑몰 & 자사 앱\n• 오프라인: 강남, 성수 플래그십 스토어 2개점\n• 입점: 마켓컬리, 29CM 라이프스타일 샵',
+            'p3-logistics': '오전 11시 이전 주문 시 당일 로스팅 후 우체국 택배 익일 도착',
+            'p3-partners': '공정무역 인증 산지 농가 직접 계약 & 친환경 포장재 파트너십',
+
+            // Promotion
+            'p4-advertising': '• 인스타그램 비주얼 감성 릴스 광고 (홈카페 튜토리얼)\n• 유튜브 커피 크리에이터 콜라보 제품 리뷰\n• 네이버 브랜드 검색 광고',
+            'p4-events': '성수 플래그십 팝업 오프라인 핸드드립 클래스 개최, SNS 인증샷 해시태그 챌린지',
+            'p4-message': '"당신의 아침을 바꾸는 단 한 잔의 완벽함, Brew & Co."'
+        };
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', () => {
+            // Set default date
+            document.getElementById('meta-date').value = new Date().toISOString().split('T')[0];
+
+            // Event Listeners for Progress Calculation & Sync
+            [...metaFields, ...pFields].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('input', () => {
+                        updateProgress();
+                        syncMatrixView();
+                    });
+                }
+            });
+
+            updateProgress();
+            syncMatrixView();
+        });
+
+        function switchView(view) {
+            const formView = document.getElementById('view-form');
+            const matrixView = document.getElementById('view-matrix');
+            const btnForm = document.getElementById('tab-btn-form');
+            const btnMatrix = document.getElementById('tab-btn-matrix');
+
+            const isForm = view === 'form';
+            if (!isForm) syncMatrixView();
+            formView.classList.toggle('hidden', !isForm);
+            matrixView.classList.toggle('hidden', isForm);
+            btnForm.classList.toggle('is-active', isForm);
+            btnMatrix.classList.toggle('is-active', !isForm);
+            btnForm.setAttribute('aria-selected', String(isForm));
+            btnMatrix.setAttribute('aria-selected', String(!isForm));
+        }
+
+        // P별(p1~p4) 작성 개수 집계 → 세그먼트 진행률, 카드 칩, 매트릭스 배지에 반영
+        function updateProgress() {
+            let filledTotal = 0;
+
+            ['p1', 'p2', 'p3', 'p4'].forEach(p => {
+                const ids = pFields.filter(id => id.startsWith(p + '-'));
+                let filled = 0;
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    const has = !!el?.value?.trim();
+                    if (has) filled++;
+                    el?.classList.toggle('is-filled', has);
+                });
+                filledTotal += filled;
+
+                const ratio = `${filled} / ${ids.length}`;
+                const complete = filled === ids.length;
+
+                document.querySelector(`[data-progress="${p}"]`).style.width = (filled / ids.length * 100) + '%';
+
+                const chip = document.querySelector(`[data-count="${p}"]`);
+                chip.innerText = ratio;
+                chip.classList.toggle('is-complete', complete);
+
+                document.querySelector(`[data-stat="${p}"]`).innerText = ratio;
+
+                const badge = document.querySelector(`[data-state="${p}"]`);
+                badge.innerText = complete ? '완료' : filled > 0 ? '작성 중' : '미착수';
+                badge.classList.toggle('is-complete', complete);
+                badge.classList.toggle('is-partial', filled > 0 && !complete);
+            });
+
+            const percent = Math.round((filledTotal / pFields.length) * 100);
+            document.getElementById('progress-percent').innerText = percent + '%';
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            try { localStorage.setItem('4p-theme', isDark ? 'dark' : 'light'); } catch (e) {}
+        }
+
+        function syncMatrixView() {
+            // Meta Sync
+            const title = document.getElementById('meta-title').value.trim() || '4P 마케팅 믹스 전략 보고서';
+            const target = document.getElementById('meta-target').value.trim() || '타겟 미지정';
+            const date = document.getElementById('meta-date').value || new Date().toISOString().split('T')[0];
+            const summary = document.getElementById('meta-summary').value.trim() || '수립된 마케팅 전략 요약이 이곳에 등록됩니다.';
+
+            document.getElementById('matrix-header-title').innerText = title;
+            document.getElementById('matrix-header-target').innerText = '타겟 대상: ' + target;
+            document.getElementById('matrix-header-date').innerText = date;
+            document.getElementById('matrix-header-summary').innerText = '💡 요약: ' + summary;
+
+            // 4P Matrix Sync
+            pFields.forEach(id => {
+                const sourceVal = document.getElementById(id)?.value?.trim();
+                const targetEl = document.getElementById('m-' + id);
+                if (targetEl) {
+                    targetEl.innerText = sourceVal ? sourceVal : '미입력';
+                    targetEl.classList.toggle('is-empty', !sourceVal);
+                }
+            });
+        }
+
+        function showToast(message, isSuccess = true) {
+            toastMessage.innerText = message;
+            toastIcon.className = isSuccess ? "fa-solid fa-circle-check toast__icon--success" : "fa-solid fa-circle-exclamation toast__icon--warning";
+
+            toast.classList.add('is-visible');
+            clearTimeout(showToast.timer);
+            showToast.timer = setTimeout(() => toast.classList.remove('is-visible'), 3000);
+        }
+
+        function loadSampleData(type = 'startup') {
+            Object.keys(sampleData).forEach(key => {
+                const el = document.getElementById(key);
+                if (el) el.value = sampleData[key];
+            });
+            updateProgress();
+            syncMatrixView();
+            showToast("샘플 데이터가 로드되었습니다!");
+        }
+
+        function clearAllFields() {
+            if (confirm("작성 중인 모든 내용이 삭제됩니다. 계속하시겠습니까?")) {
+                [...metaFields, ...pFields].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = '';
+                });
+                document.getElementById('meta-date').value = new Date().toISOString().split('T')[0];
+                updateProgress();
+                syncMatrixView();
+                showToast("모든 항목이 초기화되었습니다.", false);
+            }
+        }
+
+        function exportAsHTML() {
+            const title = document.getElementById('meta-title').value.trim() || '4P_Marketing_Mix_Strategy';
+            const target = document.getElementById('meta-target').value.trim() || '미지정';
+            const author = document.getElementById('meta-author').value.trim() || '작성자 미상';
+            const date = document.getElementById('meta-date').value || new Date().toISOString().split('T')[0];
+            const summary = document.getElementById('meta-summary').value.trim() || '등록된 요약 정보가 없습니다.';
+
+            function getVal(id) {
+                const v = document.getElementById(id)?.value?.trim();
+                return v ? v.replace(/\n/g, '<br>') : '<span class="empty">미입력</span>';
+            }
+
+            const htmlContent = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHTML(title)} - 4P Mix 마케팅 전략 보고서</title>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Pretendard', system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #1e293b; padding: 40px 20px; line-height: 1.6; }
+        .container { max-width: 900px; margin: 0 auto; background: #ffffff; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); padding: 40px; border: 1px solid #e2e8f0; }
+        .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 24px; margin-bottom: 32px; }
+        .badge { display: inline-block; background-color: #4f46e5; color: #ffffff; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 9999px; text-transform: uppercase; margin-bottom: 12px; }
+        h1 { font-size: 28px; font-weight: 800; color: #0f172a; margin-bottom: 8px; }
+        .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; background: #f1f5f9; padding: 16px; border-radius: 12px; margin-top: 16px; font-size: 13px; }
+        .meta-item { display: flex; flex-direction: column; }
+        .meta-label { font-weight: 700; color: #64748b; font-size: 11px; text-transform: uppercase; }
+        .meta-value { font-weight: 600; color: #334155; margin-top: 2px; }
+        .summary-box { margin-top: 20px; padding: 16px; background-color: #eef2ff; border-left: 4px solid #6366f1; border-radius: 8px; font-size: 14px; color: #3730a3; }
+        
+        .p-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 24px; margin-top: 32px; }
+        .p-card { border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; background: #ffffff; }
+        .p-header { padding: 14px 20px; font-weight: 800; font-size: 16px; color: #ffffff; display: flex; align-items: center; justify-content: space-between; }
+        .p1 .p-header { background-color: #2563eb; }
+        .p2 .p-header { background-color: #059669; }
+        .p3 .p-header { background-color: #d97706; }
+        .p4 .p-header { background-color: #db2777; }
+        
+        .p-body { padding: 20px; font-size: 13px; }
+        .section-title { font-weight: 700; color: #1e293b; margin-top: 12px; margin-bottom: 4px; font-size: 13px; }
+        .section-title:first-child { margin-top: 0; }
+        .content { color: #475569; background: #f8fafc; padding: 10px 12px; border-radius: 6px; border-left: 3px solid #cbd5e1; font-size: 13px; word-break: break-word; }
+        .empty { color: #94a3b8; font-style: italic; }
+        
+        .footer { text-align: center; margin-top: 40px; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+        @media print {
+            body { padding: 0; background: white; }
+            .container { box-shadow: none; border: none; padding: 0; }
+            .p-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span class="badge">4P Marketing Mix Strategy Report</span>
+            <h1>${escapeHTML(title)}</h1>
+            <div class="meta-grid">
+                <div class="meta-item"><span class="meta-label">핵심 타겟</span><span class="meta-value">${escapeHTML(target)}</span></div>
+                <div class="meta-item"><span class="meta-label">작성자 / 팀</span><span class="meta-value">${escapeHTML(author)}</span></div>
+                <div class="meta-item"><span class="meta-label">수립 일자</span><span class="meta-value">${escapeHTML(date)}</span></div>
+            </div>
+            <div class="summary-box">
+                <strong>전략 요약:</strong> ${escapeHTML(summary)}
+            </div>
+        </div>
+
+        <div class="p-grid">
+            <!-- Product -->
+            <div class="p-card p1">
+                <div class="p-header"><span>1. PRODUCT (제품 / 서비스)</span></div>
+                <div class="p-body">
+                    <div class="section-title">핵심 기능 & 가치</div>
+                    <div class="content">${getVal('p1-features')}</div>
+                    
+                    <div class="section-title">차별화 포인트 (USP)</div>
+                    <div class="content">${getVal('p1-usp')}</div>
+
+                    <div class="section-title">품질 & 고객지원</div>
+                    <div class="content">${getVal('p1-service')}</div>
+                </div>
+            </div>
+
+            <!-- Price -->
+            <div class="p-card p2">
+                <div class="p-header"><span>2. PRICE (가격)</span></div>
+                <div class="p-body">
+                    <div class="section-title">가격 책정 전략</div>
+                    <div class="content">${getVal('p2-strategy')}</div>
+                    
+                    <div class="section-title">할인 및 프로모션 정책</div>
+                    <div class="content">${getVal('p2-discounts')}</div>
+
+                    <div class="section-title">지불 수단 & 가치 제안</div>
+                    <div class="content">${getVal('p2-value')}</div>
+                </div>
+            </div>
+
+            <!-- Place -->
+            <div class="p-card p3">
+                <div class="p-header"><span>3. PLACE (유통)</span></div>
+                <div class="p-body">
+                    <div class="section-title">주요 판매 채널</div>
+                    <div class="content">${getVal('p3-channels')}</div>
+                    
+                    <div class="section-title">물류 & 배송 전략</div>
+                    <div class="content">${getVal('p3-logistics')}</div>
+
+                    <div class="section-title">파트너십 & 커버리지</div>
+                    <div class="content">${getVal('p3-partners')}</div>
+                </div>
+            </div>
+
+            <!-- Promotion -->
+            <div class="p-card p4">
+                <div class="p-header"><span>4. PROMOTION (판촉 / 홍보)</span></div>
+                <div class="p-body">
+                    <div class="section-title">광고 & 디지털 마케팅</div>
+                    <div class="content">${getVal('p4-advertising')}</div>
+                    
+                    <div class="section-title">프로모션 & PR 이벤트</div>
+                    <div class="content">${getVal('p4-events')}</div>
+
+                    <div class="section-title">핵심 메시지 (CTA)</div>
+                    <div class="content">${getVal('p4-message')}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Generated by 4P Mix Strategy Builder • ${escapeHTML(date)}
+        </div>
+    </div>
+</body>
+</html>`;
+
+            downloadFile(htmlContent, `${sanitizeFilename(title)}_4P_Strategy.html`, 'text/html');
+            showToast('HTML 보고서 파일이 다운로드되었습니다!');
+        }
+
+        function exportAsMarkdown() {
+            const title = document.getElementById('meta-title').value.trim() || '4P 마케팅 믹스 전략 보고서';
+            const target = document.getElementById('meta-target').value.trim() || '미지정';
+            const author = document.getElementById('meta-author').value.trim() || '작성자 미상';
+            const date = document.getElementById('meta-date').value || new Date().toISOString().split('T')[0];
+            const summary = document.getElementById('meta-summary').value.trim() || '등록된 요약 정보가 없습니다.';
+
+            function getMdVal(id) {
+                const val = document.getElementById(id)?.value?.trim();
+                return val ? val : '_미입력_';
+            }
+
+            const markdownContent = `# ${title} — 4P Marketing Mix Strategy
+
+> **전략 요약**: ${summary}
+
+---
+
+## 📌 기본 프로젝트 정보
+- **핵심 타겟 고객**: ${target}
+- **작성자 / 팀**: ${author}
+- **수립 일자**: ${date}
+
+---
+
+## 1. Product (제품 / 서비스)
+> 무엇을 제공하여 고객의 문제를 해결할 것인가?
+
+### 1.1 핵심 기능 및 가치 (Core Features & Value)
+${getMdVal('p1-features')}
+
+### 1.2 차별화 포인트 (USP & Branding)
+${getMdVal('p1-usp')}
+
+### 1.3 품질 & 고객 지원 (Quality & Service)
+${getMdVal('p1-service')}
+
+---
+
+## 2. Price (가격)
+> 얼마에 판매하며 고객이 느끼는 가치는 얼마인가?
+
+### 2.1 가격 책정 전략 (Pricing Strategy)
+${getMdVal('p2-strategy')}
+
+### 2.2 할인 및 혜택 정책 (Discounts & Terms)
+${getMdVal('p2-discounts')}
+
+### 2.3 지불 방식 & 가치 제안 (Payment & Perceived Value)
+${getMdVal('p2-value')}
+
+---
+
+## 3. Place (유통 / 판매 경로)
+> 고객이 제품을 어디서 구매하고 접하는가?
+
+### 3.1 주요 판매 채널 (Channels)
+${getMdVal('p3-channels')}
+
+### 3.2 물류 & 배송 전략 (Logistics & Delivery)
+${getMdVal('p3-logistics')}
+
+### 3.3 커버리지 & 파트너십 (Coverage & Partners)
+${getMdVal('p3-partners')}
+
+---
+
+## 4. Promotion (판촉 / 홍보)
+> 어떻게 알리고 고객의 구매 욕구를 자극할 것인가?
+
+### 4.1 광고 및 퍼포먼스 마케팅 (Advertising & Digital)
+${getMdVal('p4-advertising')}
+
+### 4.2 프로모션 & 이벤트 (Sales Promotion & PR)
+${getMdVal('p4-events')}
+
+### 4.3 핵심 메시지 (Key Message / CTA)
+${getMdVal('p4-message')}
+
+---
+*Generated by 4P Mix Strategy Builder on ${date}*
+`;
+
+            downloadFile(markdownContent, `${sanitizeFilename(title)}_4P_Strategy.md`, 'text/markdown');
+            showToast('마크다운(.md) 파일이 다운로드되었습니다!');
+        }
+
+        function exportAsJSON() {
+            const data = {};
+            [...metaFields, ...pFields].forEach(id => {
+                data[id] = document.getElementById(id)?.value || '';
+            });
+            const title = document.getElementById('meta-title').value.trim() || '4P_Strategy_Data';
+            downloadFile(JSON.stringify(data, null, 2), `${sanitizeFilename(title)}_backup.json`, 'application/json');
+            showToast('JSON 데이터 백업 파일이 저장되었습니다.');
+        }
+
+        function triggerJSONImport() {
+            document.getElementById('jsonFileInput').click();
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    Object.keys(data).forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.value = data[id];
+                    });
+                    updateProgress();
+                    syncMatrixView();
+                    showToast('JSON 백업 파일이 정상적으로 복원되었습니다!');
+                } catch (err) {
+                    showToast('유효하지 않은 JSON 파일입니다.', false);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // Utility: File Download Trigger
+        function downloadFile(content, filename, contentType) {
+            const blob = new Blob([content], { type: `${contentType};charset=utf-8;` });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Utility: Escape HTML
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Utility: Sanitize filename
+        function sanitizeFilename(name) {
+            return name.replace(/[^a-zA-Z0-9가-힣_-]/g, '_').substring(0, 40);
+        }
+    </script>
+</body>
+</html>
