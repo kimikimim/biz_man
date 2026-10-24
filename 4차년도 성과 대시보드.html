@@ -67,6 +67,15 @@
             </div>
 
             <div class="header-controls">
+                <div class="sync-group">
+                    <label class="sync-group__label" for="autoSyncSelect"><i class="fa-solid fa-arrows-rotate"></i> 자동 갱신:</label>
+                    <select id="autoSyncSelect" aria-label="자동 갱신 주기">
+                        <option value="0">끄기</option>
+                        <option value="30">30초</option>
+                        <option value="60" selected>1분</option>
+                        <option value="300">5분</option>
+                    </select>
+                </div>
                 <button id="refreshBtn" onclick="loadData()" class="btn btn-primary" title="구글 시트에서 최신 값 다시 불러오기">
                     <i id="refreshSpinner" class="fa-solid fa-rotate"></i>
                     <span>시트 새로고침</span>
@@ -262,6 +271,10 @@
 
     </main>
 
+    <div id="updateToast" class="update-toast" role="status" aria-live="polite">
+        <i class="fa-solid fa-circle-check"></i> 시트 값이 바뀌어 대시보드를 새로 그렸어요
+    </div>
+
     <footer class="app-footer">
         4차년도 성과 대시보드 — 출처: 경영성과_KPI_4차년도 (KPI 요약 · 경쟁사 비교 시트)
     </footer>
@@ -270,11 +283,14 @@
         /* =============================================================
            데이터 출처
            -------------------------------------------------------------
-           KPI_CSV_URL : 구글 시트 "웹에 게시" CSV (첫 탭 = KPI 요약)
-           KPI_SNAPSHOT: 시트를 못 불러올 때 쓰는 엑셀 기준 사본
-           COMPETITORS : 경쟁사 비교(4Q) 탭 값 — 게시 URL이 없어 직접 수록
+           구글 시트 "웹에 게시" CSV를 탭별로(gid) 불러온다.
+           ※ 게시 CSV는 구글이 몇 분 단위로 갱신하므로, 시트를 고친 뒤
+             대시보드 반영까지 최대 5분 정도 걸릴 수 있다.
+           *_SNAPSHOT: 시트를 못 불러올 때 쓰는 엑셀 기준 사본
            ============================================================= */
-        const KPI_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vToEQ5IQOZe8Hve6pRnysrJuHVEm6sFFznrVI6yBTYSRRzvu9PeAMTFBwg5zQZzX1hgGxiL-miRp_gS/pub?output=csv';
+        const SHEET_PUB = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vToEQ5IQOZe8Hve6pRnysrJuHVEm6sFFznrVI6yBTYSRRzvu9PeAMTFBwg5zQZzX1hgGxiL-miRp_gS/pub';
+        const GID = { kpi: '991148413', comp: '189574834' };   // KPI 요약 · 경쟁사 비교(4Q)
+        const sheetUrl = gid => `${SHEET_PUB}?gid=${gid}&single=true&output=csv&t=${Date.now()}`;
         const SNAPSHOT_DATE = '2026-10-24';
         const KPI_SNAPSHOT = `4차년도 경영성과 KPI 요약,,,,,,,,,,
 "파란 글씨=원본 수치 직접입력 / 검정=수식 / 초록=원데이터 시트 링크 / 노란 칸=산식 가정 / ""–""=원본 데이터 없음 / 등급은 낮을수록 우수",,,,,,,,,,
@@ -319,13 +335,19 @@
 ,주가,원,–,–,"7,659","4,495","4,839",+7.7%,원데이터,
 ,연구개발비,원,–,–,–,"2,400,000,000","4,800,000,000",+100.0%,원데이터,`;
 
+        const COMP_SNAPSHOT = `4차년도 4분기 경쟁사 비교 (출처: Results_reporting5.xls B1·B2),,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,
+회사,매출액(원),판매량(개),시장점유율,순이익(원),순이익률,기말재고(개),재고/판매량,신용등급,주가(원),브랜드등급,제품모델,품질등급,설비효율등급,영업직원만족도,생산직원만족도,연구개발비(추정),점유율 순위,주가 순위
+A사,"279,703,129,240","266,755",33.5%,"55,262,607,106",19.8%,"26,783",0.10분기,1.0,"8,305",1.0,7.0,1.0,1.0,1.0,1.0,"8,669,537,204",1,1
+B사(우리),"221,620,823,645","238,856",30.0%,"14,090,596,276",6.4%,"311,008",1.30분기,6.0,"4,839",2.0,5.0,2.0,4.0,4.0,2.0,"5,252,071,866",2,4
+C사,"147,450,824,000","149,537",18.8%,"17,576,510,921",11.9%,"43,731",0.29분기,6.0,"4,995",4.0,6.0,3.0,2.0,6.0,4.0,"7,601,597,358",3,2
+D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,6.0,"4,994",4.0,6.0,5.0,6.0,3.0,4.0,"3,742,086,491",4,3
+평균,"198,324,963,121","198,984",25.0%,"24,761,071,920",11.6%,"96,217",0.43분기,4.75,"5,783",2.75,6.0,2.75,3.25,3.5,2.75,"6,316,323,230",,
+,,,,,,,,,,,,,,,,,,
+"등급 항목은 낮을수록 우수. 재고/판매량 = 기말재고 ÷ 분기 판매량 (1.0 = 한 분기 판매분). 연구개발비는 리포트상 ""추정액""으로 우리 손익계산서 실제치(48억)와 다름.",,,,,,,,,,,,,,,,,,`;
+
         const SELF = 'B사';
-        const COMPETITORS = [
-            { name: 'A사', revenue: 279703129240, units: 266755, share: 33.51, profit: 55262607106, stock: 26783,  credit: 1, price: 8305, brand: 1, model: 7, quality: 1, facility: 1, salesSat: 1, prodSat: 1, rnd: 8669537204 },
-            { name: 'B사', revenue: 221620823645, units: 238856, share: 30.01, profit: 14090596276, stock: 311008, credit: 6, price: 4839, brand: 2, model: 5, quality: 2, facility: 4, salesSat: 4, prodSat: 2, rnd: 5252071866 },
-            { name: 'C사', revenue: 147450824000, units: 149537, share: 18.79, profit: 17576510921, stock: 43731,  credit: 6, price: 4995, brand: 4, model: 6, quality: 3, facility: 2, salesSat: 6, prodSat: 4, rnd: 7601597358 },
-            { name: 'D사', revenue: 144525075600, units: 140789, share: 17.69, profit: 12114573377, stock: 3345,   credit: 6, price: 4994, brand: 4, model: 6, quality: 5, facility: 6, salesSat: 3, prodSat: 4, rnd: 3742086491 }
-        ].map(c => ({ ...c, margin: c.profit / c.revenue * 100, stockRatio: c.stock / c.units }));
+        let COMPETITORS = [];   // 경쟁사 비교 탭에서 채움
 
         // 값이 내려가야 좋은 지표 (전분기 대비 색 판정용)
         const LOWER_IS_BETTER = new Set([
@@ -447,31 +469,158 @@
             return { quarters: qCols.map(i => head[i]), kpis: out };
         }
 
-        /* ---------- 데이터 불러오기: 시트 → 실패 시 사본 ---------- */
-        async function loadData() {
+        /* =============================================================
+           CSV → 경쟁사 목록
+           "회사,매출액(원),..." 행을 머리글로 찾고 "평균" 행 전까지 읽음
+           ============================================================= */
+        const COMP_COLUMNS = [
+            ['revenue',  h => h.startsWith('매출액')],     ['units',    h => h.startsWith('판매량')],
+            ['share',    h => h.startsWith('시장점유율')], ['profit',   h => h.startsWith('순이익(')],
+            ['stock',    h => h.startsWith('기말재고')],   ['credit',   h => h.startsWith('신용등급')],
+            ['price',    h => h.startsWith('주가(')],      ['brand',    h => h.startsWith('브랜드등급')],
+            ['model',    h => h.startsWith('제품모델')],   ['quality',  h => h.startsWith('품질등급')],
+            ['facility', h => h.startsWith('설비효율')],   ['salesSat', h => h.startsWith('영업직원')],
+            ['prodSat',  h => h.startsWith('생산직원')],   ['rnd',      h => h.startsWith('연구개발비')]
+        ];
+        function parseCompCsv(text) {
+            const rows = Papa.parse(text.trim(), { skipEmptyLines: false }).data;
+            const h = rows.findIndex(r => (r[0] || '').trim() === '회사');
+            if (h < 0) throw new Error('경쟁사 머리글 행을 찾지 못했습니다');
+            const head = rows[h].map(c => (c || '').trim());
+            const cols = COMP_COLUMNS.map(([key, match]) => {
+                const i = head.findIndex(match);
+                if (i < 0) throw new Error(`경쟁사 열 없음: ${key}`);
+                return [key, i];
+            });
+
+            const out = [];
+            for (const r of rows.slice(h + 1)) {
+                const raw = (r[0] || '').trim();
+                if (!raw || raw === '평균') break;
+                const c = { name: raw.includes('우리') || raw.startsWith(SELF) ? SELF : raw };
+                for (const [key, i] of cols) c[key] = parseNum(r[i]) ?? 0;
+                c.margin = c.revenue ? c.profit / c.revenue * 100 : 0;
+                c.stockRatio = c.units ? c.stock / c.units : 0;
+                out.push(c);
+            }
+            if (out.length < 2 || !out.some(c => c.name === SELF)) throw new Error('경쟁사 행이 부족합니다');
+            return out;
+        }
+
+        /* =============================================================
+           데이터 불러오기 — 탭별로 시트 → 실패 시 마지막 값 → 사본
+           자동 동기화: 정해진 주기마다 확인, 값이 바뀌었을 때만 다시 그림
+           ============================================================= */
+        const lastText = { kpi: null, comp: null };
+        let lastCheck = 0, lastChange = null, syncTimer = null, loading = false;
+
+        async function fetchTab(gid) {
+            const res = await fetch(sheetUrl(gid), { cache: 'no-store' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.text();
+        }
+
+        async function loadData(silent = false) {
+            if (loading) return;
+            loading = true;
             const spinner = document.getElementById('refreshSpinner');
-            spinner.classList.add('fa-spin');
+            if (!silent) spinner.classList.add('fa-spin');
+
             try {
-                const res = await fetch(KPI_CSV_URL + '&t=' + Date.now());
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                apply(parseKpiCsv(await res.text()));
-                const now = new Date();
-                const t = now.toTimeString().slice(0, 5);
-                setSource(true, `구글 시트 연동 · 오늘 ${t} 동기화`);
-                dismissAlert();
-            } catch (err) {
-                console.warn('시트 불러오기 실패, 사본 사용:', err);
-                apply(parseKpiCsv(KPI_SNAPSHOT));
-                setSource(false, `엑셀 사본 데이터 (${SNAPSHOT_DATE} 기준)`);
-                showError('구글 시트를 불러오지 못해 엑셀 기준 사본으로 표시합니다. 잠시 후 "시트 새로고침"을 눌러 보세요.');
+                const [kpiRes, compRes] = await Promise.allSettled([fetchTab(GID.kpi), fetchTab(GID.comp)]);
+                const tabs = {}, failed = [];
+                let usedSnapshot = false;
+                for (const [key, res, snapshot, parse] of [
+                    ['kpi',  kpiRes,  KPI_SNAPSHOT,  parseKpiCsv],
+                    ['comp', compRes, COMP_SNAPSHOT, parseCompCsv]
+                ]) {
+                    let text = res.status === 'fulfilled' ? res.value : null;
+                    try { if (text !== null) parse(text); } catch (e) { console.warn(key, e); text = null; }
+                    if (text === null) {
+                        failed.push(key);
+                        if (lastText[key] === null) usedSnapshot = true;
+                        text = lastText[key] ?? snapshot;
+                    }
+                    tabs[key] = text;
+                }
+
+                if (tabs.kpi !== lastText.kpi || tabs.comp !== lastText.comp) {
+                    const p = parseKpiCsv(tabs.kpi);
+                    quarters = p.quarters;
+                    kpis = p.kpis;
+                    COMPETITORS = parseCompCsv(tabs.comp);
+                    // 첫 로딩이 아니고, 시트에서 새로 받은 값일 때만 "변경" 알림
+                    if (lastText.kpi !== null && failed.length < 2) { lastChange = new Date(); flashUpdated(); }
+                    lastText.kpi = tabs.kpi;
+                    lastText.comp = tabs.comp;
+                    renderAll();
+                }
+                lastCheck = Date.now();
+                updateSourceText(failed, usedSnapshot);
             } finally {
-                spinner.classList.remove('fa-spin');
+                if (!silent) spinner.classList.remove('fa-spin');
+                loading = false;
             }
         }
-        function apply(parsed) {
-            quarters = parsed.quarters;
-            kpis = parsed.kpis;
-            renderAll();
+
+        const hhmm = d => d.toTimeString().slice(0, 5);
+        function autoLabel() {
+            const sec = Number(document.getElementById('autoSyncSelect').value);
+            return sec ? `자동 ${sec >= 60 ? sec / 60 + '분' : sec + '초'}` : '자동 꺼짐';
+        }
+        let lastSuccess = null;
+        function updateSourceText(failed, usedSnapshot) {
+            const tabName = k => k === 'kpi' ? 'KPI 요약' : '경쟁사 비교';
+            if (failed.length === 2) {
+                if (usedSnapshot) {
+                    setSource(false, `엑셀 사본 데이터 (${SNAPSHOT_DATE} 기준) · 시트 연결 실패 · ${autoLabel()}`);
+                    showError('구글 시트를 불러오지 못해 엑셀 기준 사본으로 표시합니다. 연결되면 자동으로 다시 불러옵니다.');
+                } else {
+                    setSource(false, `시트 연결 끊김 · ${hhmm(lastSuccess)}에 받은 값 표시 중 · ${autoLabel()}`);
+                    showError('구글 시트에 연결하지 못해 마지막으로 받은 값을 표시합니다. 연결되면 자동으로 다시 불러옵니다.');
+                }
+                return;
+            }
+            lastSuccess = new Date();
+            const changeTxt = lastChange ? ` · ${hhmm(lastChange)} 변경 반영` : '';
+            setSource(true, `구글 시트 연동 · ${hhmm(lastSuccess)} 확인${changeTxt} · ${autoLabel()}`);
+            if (failed.length) {
+                showError(`${tabName(failed[0])} 탭을 불러오지 못해 ${usedSnapshot ? '엑셀 기준 사본' : '이전 값'}으로 표시합니다.`);
+            } else dismissAlert();
+        }
+
+        // 시트 값이 바뀌면 잠깐 알림
+        function flashUpdated() {
+            const el = document.getElementById('updateToast');
+            el.classList.add('is-visible');
+            clearTimeout(flashUpdated.t);
+            flashUpdated.t = setTimeout(() => el.classList.remove('is-visible'), 4000);
+        }
+
+        function setupAutoSync() {
+            const sel = document.getElementById('autoSyncSelect');
+            try {
+                const saved = localStorage.getItem('dashboard-sync');
+                if (saved !== null && [...sel.options].some(o => o.value === saved)) sel.value = saved;
+            } catch (e) {}
+            const restart = () => {
+                clearInterval(syncTimer);
+                const sec = Number(sel.value);
+                if (sec) syncTimer = setInterval(() => { if (!document.hidden) loadData(true); }, sec * 1000);
+            };
+            sel.addEventListener('change', () => {
+                try { localStorage.setItem('dashboard-sync', sel.value); } catch (e) {}
+                restart();
+                if (lastCheck) {
+                    const src = document.getElementById('sourceText');
+                    src.textContent = src.textContent.replace(/자동 [^·]+$/, autoLabel());
+                }
+            });
+            // 다른 탭에 있다가 돌아오면 바로 확인
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && Number(sel.value) && Date.now() - lastCheck > 15000) loadData(true);
+            });
+            restart();
         }
         function setSource(live, text) {
             const dot = document.getElementById('liveDot');
@@ -852,6 +1001,7 @@
         }
         function dismissAlert() { document.getElementById('alertBox').classList.add('hidden'); }
 
+        setupAutoSync();
         loadData();
     </script>
 </body>

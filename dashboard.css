@@ -211,3 +211,32 @@ body.page-dashboard { display: flex; flex-direction: column; }
   font-size: var(--text-11); color: var(--text-secondary) !important;
 }
 .cell-note__sub { display: block; margin-top: 0.15rem; color: var(--text-tertiary); }
+
+
+/* ---------------------------------------------------------------------
+   6. 자동 갱신 — 주기 선택 · 변경 알림
+   --------------------------------------------------------------------- */
+.sync-group select:focus-visible { outline: 2px solid var(--indigo-500); outline-offset: 2px; border-radius: var(--radius-md); }
+@media (max-width: 639px) {
+  .sync-group__label { padding: 0 0.35rem; }
+}
+
+.update-toast {
+  position: fixed; left: 1rem; right: 1rem; bottom: 1.5rem; z-index: 60;
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  width: fit-content; margin: 0 auto;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm); font-weight: 600;
+  color: var(--good); background-color: var(--bg-surface);
+  border: 1px solid var(--good-border);
+  box-shadow: var(--shadow-lg);
+  opacity: 0; pointer-events: none;
+  transform: translateY(0.75rem);
+  transition: opacity var(--duration-slow) var(--ease), transform var(--duration-slow) var(--ease);
+}
+.update-toast.is-visible { opacity: 1; transform: translateY(0); }
+.dark .update-toast { background-color: var(--slate-900); }
+@media (prefers-reduced-motion: reduce) {
+  .update-toast { transition: none; }
+}
