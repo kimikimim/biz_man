@@ -240,3 +240,8 @@ body.page-dashboard { display: flex; flex-direction: column; }
 @media (prefers-reduced-motion: reduce) {
   .update-toast { transition: none; }
 }
+
+/* 푸터의 원본 시트 링크 */
+.footer-link { color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px; }
+.footer-link:hover { color: var(--accent-hover); }
+#sheetLink { display: inline-flex; align-items: center; text-decoration: none; }
