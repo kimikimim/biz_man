@@ -31,16 +31,11 @@
         })();
     </script>
 
-    <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <!-- PapaParse for CSV Parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <!-- 공통 디자인 시스템 + 페이지 전용 보정 -->
+    <!-- 공통 디자인 시스템 + 페이지 전용 스타일 -->
     <link rel="stylesheet" href="global.css">
     <link rel="stylesheet" href="dashboard.css">
 </head>
@@ -53,21 +48,18 @@
         <div class="app-header__inner">
             <div class="app-header__brand">
                 <div class="brand-group">
-                    <div class="logo-mark">
-                        <i class="fa-solid fa-chart-line"></i>
-                    </div>
+                    <div class="logo-mark"><i class="fa-solid fa-chart-line"></i></div>
                     <div>
                         <div class="title-row">
                             <h1 class="app-title">4차년도 성과 대시보드</h1>
-                            <span class="pill-badge">Executive Analytics</span>
+                            <span class="pill-badge">B사 · KPI</span>
                         </div>
                         <p class="app-subtitle">
-                            <span id="liveStatusBadge" class="live-dot pulse-live"></span>
-                            <span id="lastUpdatedText">구글 시트 연동 대기 중...</span>
+                            <span id="liveDot" class="live-dot"></span>
+                            <span id="sourceText">데이터 불러오는 중...</span>
                         </p>
                     </div>
                 </div>
-
                 <button class="theme-toggle-mobile" onclick="toggleTheme()" aria-label="테마 전환">
                     <i class="fa-solid fa-moon icon-moon"></i>
                     <i class="fa-solid fa-sun icon-sun"></i>
@@ -75,25 +67,10 @@
             </div>
 
             <div class="header-controls">
-                <div class="sync-group">
-                    <span class="sync-group__label"><i class="fa-solid fa-arrows-rotate"></i> 동기화:</span>
-                    <select id="autoSyncSelect">
-                        <option value="0">수동</option>
-                        <option value="10" selected>10초</option>
-                        <option value="30">30초</option>
-                        <option value="60">1분</option>
-                    </select>
-                </div>
-
-                <button id="refreshBtn" onclick="fetchSheetData()" class="btn btn-primary">
+                <button id="refreshBtn" onclick="loadData()" class="btn btn-primary" title="구글 시트에서 최신 값 다시 불러오기">
                     <i id="refreshSpinner" class="fa-solid fa-rotate"></i>
-                    <span>새로고침</span>
+                    <span>시트 새로고침</span>
                 </button>
-
-                <button onclick="toggleUrlModal()" class="btn btn-secondary" title="출처 URL 변경">
-                    <i class="fa-solid fa-link"></i>
-                </button>
-
                 <button class="theme-toggle" onclick="toggleTheme()" aria-label="테마 전환">
                     <i class="fa-solid fa-moon icon-moon"></i>
                     <i class="fa-solid fa-sun icon-sun"></i>
@@ -104,948 +81,778 @@
 
     <main class="app-main">
 
-        <!-- Error Alert Box -->
         <div id="alertBox" class="alert hidden">
             <div class="brand-group">
                 <i class="fa-solid fa-triangle-exclamation alert__icon"></i>
-                <span id="alertMessage">데이터 수신 중 메시지</span>
+                <span id="alertMessage"></span>
             </div>
             <button onclick="dismissAlert()" class="alert__close" aria-label="닫기"><i class="fa-solid fa-xmark"></i></button>
         </div>
 
-        <!-- Executive Summary KPI Row -->
-        <section id="kpiContainer" class="kpi-grid">
-            <!-- Skeletons while loading -->
-            <div class="glass-panel skeleton-card animate-pulse">
-                <div class="skeleton-line skeleton-line--title"></div>
-                <div class="skeleton-line skeleton-line--value"></div>
-            </div>
-            <div class="glass-panel skeleton-card animate-pulse">
-                <div class="skeleton-line skeleton-line--title"></div>
-                <div class="skeleton-line skeleton-line--value"></div>
-            </div>
-            <div class="glass-panel skeleton-card animate-pulse">
-                <div class="skeleton-line skeleton-line--title"></div>
-                <div class="skeleton-line skeleton-line--value"></div>
-            </div>
-            <div class="glass-panel skeleton-card animate-pulse">
-                <div class="skeleton-line skeleton-line--title"></div>
-                <div class="skeleton-line skeleton-line--value"></div>
-            </div>
+        <!-- ---------- 핵심 KPI 4종 (4분기, 전분기 대비) ---------- -->
+        <section id="kpiContainer" class="kpi-grid" aria-label="4분기 핵심 지표">
+            <div class="glass-panel skeleton-card animate-pulse"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--value"></div></div>
+            <div class="glass-panel skeleton-card animate-pulse"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--value"></div></div>
+            <div class="glass-panel skeleton-card animate-pulse"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--value"></div></div>
+            <div class="glass-panel skeleton-card animate-pulse"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--value"></div></div>
         </section>
 
-        <!-- 5 KEY METRIC ANALYTICS CHARTS SECTION -->
-        <div class="section-heading">
-            <div>
-                <h2 class="section-heading__title">
-                    <i class="fa-solid fa-chart-column"></i>
-                    5대 주요 지표 데이터분석 시각화
-                </h2>
-                <p class="section-heading__desc">데이터 구조 자동 감지 기반 다차원 통계 및 가독성 최적화 그래프</p>
-            </div>
-            <div class="heading-controls">
-                <span class="heading-controls__label">주요 수치 지표:</span>
-                <select id="primaryMetricSelect" onchange="processDataAndRender()" class="metric-select">
-                    <!-- Dynamic Metric Select Options -->
-                </select>
-            </div>
-        </div>
-
-        <!-- Charts Grid 1 -->
-        <section class="chart-grid-2">
-
-            <!-- CHART 1: Vertical Bar -->
-            <div class="glass-panel chart-card chart--indigo">
-                <div class="chart-card__header">
-                    <div>
-                        <div class="chart-card__title-row">
-                            <span class="chart-card__dot"></span>
-                            <h3 class="chart-card__title">지표 1. 범주별 정량 비교 분석 (Bar Chart)</h3>
-                        </div>
-                        <p class="chart-card__desc">핵심 범주 항목별 수치 크기 및 편차 비교</p>
-                    </div>
-                    <span class="chart-card__tag">막대형</span>
-                </div>
-                <div class="chart-card__body">
-                    <canvas id="chart1Bar"></canvas>
-                </div>
-            </div>
-
-            <!-- CHART 2: Area Line -->
-            <div class="glass-panel chart-card chart--emerald">
-                <div class="chart-card__header">
-                    <div>
-                        <div class="chart-card__title-row">
-                            <span class="chart-card__dot"></span>
-                            <h3 class="chart-card__title">지표 2. 데이터 흐름 및 시계열 추이 (Area Line)</h3>
-                        </div>
-                        <p class="chart-card__desc">레코드 연속성에 따른 데이터 증가/감소 변화 모니터링</p>
-                    </div>
-                    <span class="chart-card__tag">선형/영역</span>
-                </div>
-                <div class="chart-card__body">
-                    <canvas id="chart2Line"></canvas>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- Charts Grid 2 -->
-        <section class="chart-grid-3">
-
-            <!-- CHART 3: Horizontal Bar -->
-            <div class="glass-panel chart-card chart--amber">
-                <div class="chart-card__header">
-                    <div>
-                        <div class="chart-card__title-row">
-                            <span class="chart-card__dot"></span>
-                            <h3 class="chart-card__title">지표 3. Top 랭킹 비교 (Horizontal Bar)</h3>
-                        </div>
-                        <p class="chart-card__desc">상위 항목 서열화 및 정밀 비교</p>
-                    </div>
-                    <span class="chart-card__tag">가로 막대</span>
-                </div>
-                <div class="chart-card__body">
-                    <canvas id="chart3HorizontalBar"></canvas>
-                </div>
-            </div>
-
-            <!-- CHART 4: Doughnut -->
-            <div class="glass-panel chart-card chart--violet">
-                <div class="chart-card__header">
-                    <div>
-                        <div class="chart-card__title-row">
-                            <span class="chart-card__dot"></span>
-                            <h3 class="chart-card__title">지표 4. 범주 점유 비율 (Doughnut)</h3>
-                        </div>
-                        <p class="chart-card__desc">전체 대비 항목 그룹별 비중 점유율</p>
-                    </div>
-                    <span class="chart-card__tag">도넛형</span>
-                </div>
-                <div class="chart-card__body chart-card__body--center">
-                    <canvas id="chart4Doughnut"></canvas>
-                </div>
-            </div>
-
-            <!-- CHART 5: Multi -->
-            <div class="glass-panel chart-card chart--pink">
-                <div class="chart-card__header">
-                    <div>
-                        <div class="chart-card__title-row">
-                            <span class="chart-card__dot"></span>
-                            <h3 class="chart-card__title">지표 5. 다차원 복합 지표 매핑 (Multi Bar/Line)</h3>
-                        </div>
-                        <p class="chart-card__desc">1차 수치 및 2차 지표 간 복합 상관관계</p>
-                    </div>
-                    <span class="chart-card__tag">복합 시각화</span>
-                </div>
-                <div class="chart-card__body">
-                    <canvas id="chart5Multi"></canvas>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- EXECUTIVE DATA ANALYST INSIGHTS CALLOUT -->
+        <!-- ---------- 4분기 진단 요약 ---------- -->
         <section class="glass-panel insight">
             <div class="insight__glow"></div>
             <div class="insight__inner">
                 <div class="insight__content">
                     <div class="insight__labels">
-                        <span class="insight__label"><i class="fa-solid fa-brain"></i>데이터 전문가 리포트</span>
-                        <span id="insightBadge" class="insight__status">자동 분석 완료</span>
+                        <span class="insight__label"><i class="fa-solid fa-clipboard-check"></i>4분기 진단</span>
+                        <span id="insightBadge" class="insight__status"></span>
                     </div>
-                    <h3 class="insight__title">핵심 통계 진단 및 이상치 패턴</h3>
-                    <p id="insightText" class="insight__text">
-                        데이터 수집이 완료되면 주요 최댓값 항목과 분산 통계가 자동으로 요약 작성됩니다.
-                    </p>
-                </div>
-
-                <div class="stat-grid">
-                    <div class="stat-card">
-                        <p class="stat-card__label">최고 수치 피크</p>
-                        <p id="statMaxVal" class="stat-card__value stat-card__value--max">-</p>
-                    </div>
-                    <div class="stat-card">
-                        <p class="stat-card__label">평균 대표 수치</p>
-                        <p id="statAvgVal" class="stat-card__value stat-card__value--avg">-</p>
-                    </div>
-                    <div class="stat-card">
-                        <p class="stat-card__label">데이터 집중 비율</p>
-                        <p id="statConcentration" class="stat-card__value stat-card__value--conc">-</p>
-                    </div>
+                    <h3 class="insight__title">매출은 늘었지만 이익·현금·재고는 나빠졌어요</h3>
+                    <p id="insightText" class="insight__text">데이터를 불러오면 요약이 표시됩니다.</p>
                 </div>
             </div>
         </section>
 
-        <!-- Data Table Section -->
+        <!-- ---------- 경고 지표 ---------- -->
+        <div class="section-heading">
+            <div>
+                <h2 class="section-heading__title"><i class="fa-solid fa-triangle-exclamation"></i> 경고 지표</h2>
+                <p class="section-heading__desc">4분기 값 기준 자동 판정 · 위험 / 주의 / 양호</p>
+            </div>
+            <div id="statusCounts" class="status-counts"></div>
+        </div>
+        <section id="statusGrid" class="status-grid" aria-label="경고 지표"></section>
+
+        <!-- ---------- 분기별 추이 ---------- -->
+        <div class="section-heading">
+            <div>
+                <h2 class="section-heading__title"><i class="fa-solid fa-chart-column"></i> 분기별 추이</h2>
+                <p class="section-heading__desc">3차년도 4분기 → 4차년도 4분기 · 빈 칸은 원본 데이터 없음</p>
+            </div>
+        </div>
+
+        <section class="chart-grid-2">
+            <div class="glass-panel chart-card chart--indigo">
+                <div class="chart-card__header">
+                    <div>
+                        <div class="chart-card__title-row"><span class="chart-card__dot"></span><h3 class="chart-card__title">매출 실적 vs 계획</h3></div>
+                        <p class="chart-card__desc">단위: 억원 · 4분기는 계획을 3,241억 → 1,690억으로 낮춘 결과</p>
+                    </div>
+                    <span class="chart-card__tag">매출</span>
+                </div>
+                <div class="chart-card__body"><canvas id="chartRevenue" role="img" aria-label="분기별 매출 실적과 계획"></canvas></div>
+            </div>
+
+            <div class="glass-panel chart-card chart--pink">
+                <div class="chart-card__header">
+                    <div>
+                        <div class="chart-card__title-row"><span class="chart-card__dot"></span><h3 class="chart-card__title">수익성 비율</h3></div>
+                        <p class="chart-card__desc">단위: % · 판관비율이 오르며 영업이익률이 2분기 이후 하락</p>
+                    </div>
+                    <span class="chart-card__tag">수익성</span>
+                </div>
+                <div class="chart-card__body"><canvas id="chartMargin" role="img" aria-label="분기별 매출총이익률, 영업이익률, 순이익률, 판관비율"></canvas></div>
+            </div>
+
+            <div class="glass-panel chart-card chart--amber">
+                <div class="chart-card__header">
+                    <div>
+                        <div class="chart-card__title-row"><span class="chart-card__dot"></span><h3 class="chart-card__title">생산 · 판매 · 재고</h3></div>
+                        <p class="chart-card__desc">단위: 개 · 생산이 판매를 앞지르며 기말재고 급증</p>
+                    </div>
+                    <span class="chart-card__tag">물량</span>
+                </div>
+                <div class="chart-card__body"><canvas id="chartVolume" role="img" aria-label="분기별 생산량, 판매량, 기말재고"></canvas></div>
+            </div>
+
+            <div class="glass-panel chart-card chart--emerald">
+                <div class="chart-card__header">
+                    <div>
+                        <div class="chart-card__title-row"><span class="chart-card__dot"></span><h3 class="chart-card__title">현금흐름 · 긴급자금</h3></div>
+                        <p class="chart-card__desc">단위: 억원 · 영업활동 현금흐름 적자를 긴급자금대출로 메우는 구조</p>
+                    </div>
+                    <span class="chart-card__tag">현금</span>
+                </div>
+                <div class="chart-card__body"><canvas id="chartCash" role="img" aria-label="분기별 영업활동 현금흐름과 긴급자금대출"></canvas></div>
+            </div>
+        </section>
+
+        <!-- ---------- 경쟁사 비교 ---------- -->
+        <div class="section-heading">
+            <div>
+                <h2 class="section-heading__title"><i class="fa-solid fa-ranking-star"></i> 경쟁사 비교 (4분기)</h2>
+                <p class="section-heading__desc">출처: Results_reporting5.xls · 우리 회사(B사)만 색으로 강조</p>
+            </div>
+        </div>
+
+        <section class="chart-grid-3">
+            <div class="glass-panel chart-card chart--indigo">
+                <div class="chart-card__header">
+                    <div>
+                        <div class="chart-card__title-row"><span class="chart-card__dot"></span><h3 class="chart-card__title">시장점유율</h3></div>
+                        <p class="chart-card__desc">단위: % · 높을수록 좋음</p>
+                    </div>
+                    <span id="rankShare" class="chart-card__tag"></span>
+                </div>
+                <div class="chart-card__body chart-card__body--sm"><canvas id="chartCompShare" role="img" aria-label="4개사 시장점유율"></canvas></div>
+            </div>
+            <div class="glass-panel chart-card chart--indigo">
+                <div class="chart-card__header">
+                    <div>
+                        <div class="chart-card__title-row"><span class="chart-card__dot"></span><h3 class="chart-card__title">순이익률</h3></div>
+                        <p class="chart-card__desc">단위: % · 높을수록 좋음</p>
+                    </div>
+                    <span id="rankMargin" class="chart-card__tag"></span>
+                </div>
+                <div class="chart-card__body chart-card__body--sm"><canvas id="chartCompMargin" role="img" aria-label="4개사 순이익률"></canvas></div>
+            </div>
+            <div class="glass-panel chart-card chart--indigo">
+                <div class="chart-card__header">
+                    <div>
+                        <div class="chart-card__title-row"><span class="chart-card__dot"></span><h3 class="chart-card__title">재고 / 판매량</h3></div>
+                        <p class="chart-card__desc">단위: 분기분 · 낮을수록 좋음 (1.0 = 한 분기 판매분)</p>
+                    </div>
+                    <span id="rankStock" class="chart-card__tag"></span>
+                </div>
+                <div class="chart-card__body chart-card__body--sm"><canvas id="chartCompStock" role="img" aria-label="4개사 재고 대비 판매량"></canvas></div>
+            </div>
+        </section>
+
         <section class="glass-panel table-section">
             <div class="table-toolbar">
                 <div>
-                    <h3 class="table-section__title">
-                        <i class="fa-solid fa-table"></i>
-                        실시간 전수 데이터 탐색기
-                    </h3>
-                    <p class="table-section__desc">연동된 구글 시트 원본 데이터 검증 및 필터링 검색</p>
+                    <h3 class="table-section__title"><i class="fa-solid fa-scale-balanced"></i> 경쟁사 상세 비교</h3>
+                    <p class="table-section__desc">등급 항목은 낮을수록 우수 · 각 행의 1위 값은 굵게 표시 · 연구개발비는 리포트상 추정액</p>
                 </div>
+            </div>
+            <div class="table-wrap">
+                <table class="data-table comp-table">
+                    <thead id="compHead"></thead>
+                    <tbody id="compBody"></tbody>
+                </table>
+            </div>
+        </section>
 
+        <!-- ---------- 전체 KPI 표 ---------- -->
+        <section class="glass-panel table-section">
+            <div class="table-toolbar">
+                <div>
+                    <h3 class="table-section__title"><i class="fa-solid fa-table"></i> 전체 KPI 표</h3>
+                    <p class="table-section__desc">KPI 요약 시트 원본 · 전분기 대비는 4분기 vs 3분기 (비율 지표는 %p 차이)</p>
+                </div>
                 <div class="table-toolbar__actions">
                     <div class="search-field">
                         <i class="fa-solid fa-magnifying-glass"></i>
-                        <input type="text" id="searchInput" oninput="filterTable()" placeholder="검색어 입력..." class="input">
+                        <input type="text" id="searchInput" oninput="renderKpiTable()" placeholder="KPI 검색..." class="input" aria-label="KPI 검색">
                     </div>
-
-                    <select id="categoryFilter" onchange="filterTable()" class="select">
-                        <option value="ALL">전체 범주 보기</option>
+                    <select id="sectionFilter" onchange="renderKpiTable()" class="select" aria-label="분류 필터">
+                        <option value="ALL">전체 분류</option>
                     </select>
-
-                    <button onclick="exportFilteredCSV()" class="btn btn-success">
-                        <i class="fa-solid fa-file-excel"></i>
-                        <span>CSV 추출</span>
+                    <button onclick="exportCSV()" class="btn btn-success">
+                        <i class="fa-solid fa-file-excel"></i><span>CSV 추출</span>
                     </button>
                 </div>
             </div>
-
             <div class="table-wrap">
-                <table class="data-table">
-                    <thead id="tableHead"></thead>
-                    <tbody id="tableBody"></tbody>
+                <table class="data-table kpi-table">
+                    <thead id="kpiHead"></thead>
+                    <tbody id="kpiBody"></tbody>
                 </table>
-            </div>
-
-            <div class="pagination">
-                <div>
-                    총 <span id="filteredCount" class="pagination__count">0</span>개 데이터 표시 중 (전체 <span id="totalRowCount">0</span>개)
-                </div>
-                <div class="pagination__controls">
-                    <button id="prevPageBtn" onclick="changePage(-1)" class="btn btn-muted btn-page">이전</button>
-                    <span id="pageIndicator" class="pagination__indicator">1 / 1</span>
-                    <button id="nextPageBtn" onclick="changePage(1)" class="btn btn-muted btn-page">다음</button>
-                </div>
             </div>
         </section>
 
     </main>
 
     <footer class="app-footer">
-        4차년도 성과 대시보드 — 구글 시트 게시 CSV 실시간 연동
+        4차년도 성과 대시보드 — 출처: 경영성과_KPI_4차년도 (KPI 요약 · 경쟁사 비교 시트)
     </footer>
 
-    <!-- Custom CSV URL Modal -->
-    <div id="urlModal" class="modal-backdrop hidden">
-        <div class="modal">
-            <div class="modal__header">
-                <h3 class="modal__title">
-                    <i class="fa-solid fa-link"></i>
-                    구글 시트 연동 URL 설정
-                </h3>
-                <button onclick="toggleUrlModal()" class="modal__close" aria-label="닫기"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <p class="modal__desc">
-                구글 시트의 <strong>[파일] &gt; [공유] &gt; [웹에 게시]</strong>에서 형식으로 <strong>CSV</strong>를 선택한 URL을 입력하시면 실시간 동기화됩니다.
-            </p>
-            <div>
-                <label class="form-label" for="customUrlInput">게시된 CSV URL</label>
-                <input type="text" id="customUrlInput" class="input input--lg" placeholder="https://docs.google.com/spreadsheets/.../pub?output=csv">
-            </div>
-            <div class="modal__footer">
-                <button onclick="toggleUrlModal()" class="btn btn-muted">취소</button>
-                <button onclick="saveCustomUrl()" class="btn btn-primary">적용하기</button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // Default Google Sheet CSV URL
-        let currentCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vToEQ5IQOZe8Hve6pRnysrJuHVEm6sFFznrVI6yBTYSRRzvu9PeAMTFBwg5zQZzX1hgGxiL-miRp_gS/pub?output=csv';
+        /* =============================================================
+           데이터 출처
+           -------------------------------------------------------------
+           KPI_CSV_URL : 구글 시트 "웹에 게시" CSV (첫 탭 = KPI 요약)
+           KPI_SNAPSHOT: 시트를 못 불러올 때 쓰는 엑셀 기준 사본
+           COMPETITORS : 경쟁사 비교(4Q) 탭 값 — 게시 URL이 없어 직접 수록
+           ============================================================= */
+        const KPI_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vToEQ5IQOZe8Hve6pRnysrJuHVEm6sFFznrVI6yBTYSRRzvu9PeAMTFBwg5zQZzX1hgGxiL-miRp_gS/pub?output=csv';
+        const SNAPSHOT_DATE = '2026-10-24';
+        const KPI_SNAPSHOT = `4차년도 경영성과 KPI 요약,,,,,,,,,,
+"파란 글씨=원본 수치 직접입력 / 검정=수식 / 초록=원데이터 시트 링크 / 노란 칸=산식 가정 / ""–""=원본 데이터 없음 / 등급은 낮을수록 우수",,,,,,,,,,
+,,,,,,,,,,
+구분,KPI,단위,3차년도 4분기,4차년도 1분기,4차년도 2분기,4차년도 3분기,4차년도 4분기,전분기 대비(4Q vs 3Q),산식,비고
+기존 지표,,,,,,,,,,
+,매출액,원,"88,631,620,000","78,568,435,236","132,599,384,648","166,944,124,122","221,620,823,645",+32.8%,원데이터,
+,영업이익,원,"5,069,504,571","1,069,368,868","25,280,146,497","20,611,212,916","17,380,678,255",-15.7%,원데이터,
+,판매가능량,개,"151,537","144,149","182,692","361,794","549,864",+52.0%,원데이터,
+,판매량,개,"129,860","106,611","168,958","193,904","238,856",+23.2%,원데이터,
+,발주량,개,"150,000","150,000","155,000","370,000","80,002",-78.4%,원데이터,3개국 발주량 합
+,생산량,개,"136,080","122,472","145,152","348,062","381,974",+9.7%,원데이터,
+,인당 판매량,개,251,214,351,319,339,+6.3%,한·미·중 인당판매량 단순평균,3Y4·1Q는 기존 시트1 값
+,기말재고,개,"21,677","37,539","13,732","167,890","311,008",+85.2%,원데이터,
+,판매가(평균),원,"682,517","736,964","784,807","860,963","927,843",+7.8%,매출액 ÷ 판매량,
+,단위당 제조원가,원,"361,523","414,843","349,205","327,585","388,213",+18.5%,당기제품 제조원가 ÷ 생산량 (3개국 가중평균),2Q 이전은 한국 단독 생산 값
+,마케팅 원가(단위당),원,"282,208","130,569","126,608","195,428","301,933",+54.5%,(광고비+판촉비) ÷ 판매량 ※가정,기존 산식 미확인. 3Y4 값은 단위당 판관비와 동일(복붙 의심)
+,단위당 판관비,원,"282,208","312,350","250,060","425,634","504,439",+18.5%,판관비 ÷ 판매량,"1Q는 판관비 33,299,944,274 기준 재계산값 312,350 (기존 시트1 값 312,320과 30원 차이)"
+수익성,,,,,,,,,,
+,매출총이익률,%,–,–,50.9%,61.8%,62.2%,+0.4%p,매출총이익 ÷ 매출액,
+,영업이익률,%,5.7%,1.4%,19.1%,12.3%,7.8%,-4.5%p,영업이익 ÷ 매출액,3분기 연속 하락
+,순이익률,%,–,–,16.0%,9.9%,6.4%,-3.5%p,당기순이익 ÷ 매출액,
+,판관비율,%,–,42.4%,31.9%,49.4%,54.4%,+4.9%p,판관비 ÷ 매출액,이익률 하락의 주원인
+현금·재고·재무,,,,,,,,,,
+,영업활동 현금흐름,원,–,"(3,300,000,000)",–,"(45,213,824,464)","(70,303,001,975)",-55.5%,원데이터,2분기 연속 적자
+,긴급자금대출,원,–,–,–,"39,829,947,341","40,837,479,129",+2.5%,원데이터,기말 현금 0원
+,판매율(소진율),%,85.7%,74.0%,92.5%,53.6%,43.4%,-10.2%p,판매량 ÷ 판매가능량,
+,재고 보유기간,분기,0.17분기,0.35분기,0.08분기,0.87분기,1.30분기,+50.4%,기말재고 ÷ 판매량,1.0 = 한 분기 판매분
+,재고자산(금액),원,–,–,"5,723,348,660","55,942,385,850","120,477,999,891",+115.4%,원데이터,
+,매출채권,원,–,–,–,"66,777,649,649","88,648,329,458",+32.8%,원데이터,
+,부채비율,%,–,–,–,35.1%,87.3%,+52.2%p,부채총계 ÷ 자본총계,
+효율,,,,,,,,,,
+,마케팅 효율,배,–,–,–,4.41x,3.07x,-30.2%,매출액 ÷ (광고비+판촉비),광고·판촉 1원당 매출
+,매출 계획 달성률,%,–,70.1%,104.5%,51.5%,131.1%,+79.6%p,매출 실적 ÷ 매출 계획,"4Q는 계획을 3,241억→1,690억으로 하향한 결과"
+경쟁력(BSC),,,,,,,,,,
+,시장점유율,%,–,24.1%,27.6%,30.5%,30.0%,-0.5%p,원데이터,
+,브랜드등급,등급,–,–,3.0,2.0,2.0,0,원데이터,낮을수록 우수
+,품질등급,등급,–,–,4.0,3.0,2.0,-1.0,원데이터,낮을수록 우수
+,제품모델 번호,번호,–,–,4.0,4.0,5.0,+1.0,원데이터,높을수록 신모델
+,영업직원 생산성등급,등급,–,–,5.667,5.667,6.333,+0.666,원데이터,낮을수록 우수
+,신용등급,등급,–,–,1.0,6.0,6.0,0,원데이터,낮을수록 우수
+,주가,원,–,–,"7,659","4,495","4,839",+7.7%,원데이터,
+,연구개발비,원,–,–,–,"2,400,000,000","4,800,000,000",+100.0%,원데이터,`;
 
-        // Global Application State
-        let rawData = [];
-        let headers = [];
-        let filteredData = [];
-        let numericColumns = [];
-        let categoricalColumns = [];
-        let primaryCategoryCol = '';
-        let primaryNumericCol = '';
-        let secondaryNumericCol = '';
-        
-        let autoSyncTimer = null;
-        let currentPage = 1;
-        const pageSize = 10;
+        const SELF = 'B사';
+        const COMPETITORS = [
+            { name: 'A사', revenue: 279703129240, units: 266755, share: 33.51, profit: 55262607106, stock: 26783,  credit: 1, price: 8305, brand: 1, model: 7, quality: 1, facility: 1, salesSat: 1, prodSat: 1, rnd: 8669537204 },
+            { name: 'B사', revenue: 221620823645, units: 238856, share: 30.01, profit: 14090596276, stock: 311008, credit: 6, price: 4839, brand: 2, model: 5, quality: 2, facility: 4, salesSat: 4, prodSat: 2, rnd: 5252071866 },
+            { name: 'C사', revenue: 147450824000, units: 149537, share: 18.79, profit: 17576510921, stock: 43731,  credit: 6, price: 4995, brand: 4, model: 6, quality: 3, facility: 2, salesSat: 6, prodSat: 4, rnd: 7601597358 },
+            { name: 'D사', revenue: 144525075600, units: 140789, share: 17.69, profit: 12114573377, stock: 3345,   credit: 6, price: 4994, brand: 4, model: 6, quality: 5, facility: 6, salesSat: 3, prodSat: 4, rnd: 3742086491 }
+        ].map(c => ({ ...c, margin: c.profit / c.revenue * 100, stockRatio: c.stock / c.units }));
 
-        // Chart Instances
-        let chart1BarInst = null;
-        let chart2LineInst = null;
-        let chart3HorizInst = null;
-        let chart4DoughnutInst = null;
-        let chart5MultiInst = null;
+        // 값이 내려가야 좋은 지표 (전분기 대비 색 판정용)
+        const LOWER_IS_BETTER = new Set([
+            '기말재고', '재고 보유기간', '재고자산(금액)', '매출채권', '부채비율', '판관비율',
+            '단위당 제조원가', '마케팅 원가(단위당)', '단위당 판관비', '긴급자금대출',
+            '브랜드등급', '품질등급', '영업직원 생산성등급', '신용등급'
+        ]);
+        // 방향만으로 좋고 나쁨을 말할 수 없는 지표
+        const NEUTRAL = new Set(['판매가능량', '발주량', '생산량', '연구개발비']);
 
-        // Startup Handler
-        window.onload = function() {
-            initTheme();
-            setupAutoSync();
-            fetchSheetData();
-        };
+        /* ---------- 상태 ---------- */
+        let quarters = [];      // ['3차년도 4분기', ...]
+        let kpis = [];          // [{section, name, unit, values[], change, formula, note}]
+        const charts = {};
 
-        // 테마가 바뀌면(헤더 버튼이든 허브든) 차트 글자·격자 색을 다시 그림
-        function initTheme() {
-            let wasDark = document.documentElement.classList.contains('dark');
-            new MutationObserver(() => {
-                const isDark = document.documentElement.classList.contains('dark');
-                if (isDark !== wasDark) { wasDark = isDark; updateAll5Charts(); }
-            }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        /* ---------- 유틸 ---------- */
+        function esc(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+        const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        const K = name => kpis.find(k => k.name === name) || { values: [], unit: '', change: '', note: '' };
+        const last = arr => arr[arr.length - 1];
+        const prev = arr => arr[arr.length - 2];
+        const shortQ = q => q.replace('3차년도 ', "3Y ").replace('4차년도 ', '').replace('분기', 'Q');
+
+        // "88,631,620,000" · "(3,300,000,000)" · "5.7%" · "4.41x" · "0.17분기" · "–" → 숫자 | null
+        function parseNum(raw) {
+            const s = String(raw ?? '').trim();
+            if (!s || s === '–' || s === '-') return null;
+            const neg = /^\(.*\)$/.test(s) || /^[-−]/.test(s);
+            const n = Number(s.replace(/[()\s,%px원개분기−+-]/g, ''));
+            return isNaN(n) ? null : (neg ? -n : n);
         }
 
-        function toggleTheme() {
-            const isDark = document.documentElement.classList.toggle('dark');
-            try { localStorage.setItem('dashboard-theme', isDark ? 'dark' : 'light'); } catch (e) {}
+        function fmtEok(v) {
+            const e = v / 1e8;
+            const abs = Math.abs(e);
+            const body = abs >= 100 ? Math.round(abs).toLocaleString('ko-KR') : abs.toFixed(1);
+            return (e < 0 ? '−' : '') + body + '억';
         }
-
-        function setupAutoSync() {
-            const select = document.getElementById('autoSyncSelect');
-            select.addEventListener('change', (e) => {
-                if(autoSyncTimer) clearInterval(autoSyncTimer);
-                const intervalSec = parseInt(e.target.value);
-                if(intervalSec > 0) {
-                    autoSyncTimer = setInterval(() => {
-                        fetchSheetData(true);
-                    }, intervalSec * 1000);
-                }
-            });
-
-            autoSyncTimer = setInterval(() => {
-                fetchSheetData(true);
-            }, 10000);
-        }
-
-        async function fetchSheetData(isSilent = false) {
-            const spinner = document.getElementById('refreshSpinner');
-            if(!isSilent && spinner) spinner.classList.add('fa-spin');
-
-            try {
-                const urlWithBuster = currentCsvUrl + (currentCsvUrl.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
-                
-                Papa.parse(urlWithBuster, {
-                    download: true,
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: function(results) {
-                        if (results.data && results.data.length > 0) {
-                            rawData = results.data;
-                            headers = results.meta.fields || Object.keys(rawData[0]);
-                            processDataAndRender();
-                            updateLastUpdatedTime();
-                            dismissAlert();
-                        } else {
-                            showError("수신된 데이터가 비어있어 데모 샘플 데이터로 전환합니다.");
-                            loadFallbackDemoData();
-                        }
-                        if(!isSilent && spinner) spinner.classList.remove('fa-spin');
-                    },
-                    error: function(err) {
-                        console.warn("Direct CSV Fetch failed, trying CORS proxy fallback...", err);
-                        fetchViaProxy(currentCsvUrl, isSilent);
-                    }
-                });
-            } catch (error) {
-                console.error("Fetch Exception:", error);
-                fetchViaProxy(currentCsvUrl, isSilent);
+        function fmt(v, unit) {
+            if (v === null || v === undefined) return '–';
+            switch (unit) {
+                case '원':   return Math.abs(v) >= 1e8 ? fmtEok(v) : v.toLocaleString('ko-KR') + '원';
+                case '개':   return v.toLocaleString('ko-KR') + '개';
+                case '%':    return v.toFixed(1) + '%';
+                case '배':   return v.toFixed(2) + '배';
+                case '분기': return v.toFixed(2) + '분기';
+                case '등급': return (Number.isInteger(v) ? v : v.toFixed(2)) + '등급';
+                case '번호': return '모델 ' + v;
+                default:     return v.toLocaleString('ko-KR');
             }
         }
+        const signed = s => String(s || '').replace(/^-/, '−');
 
-        async function fetchViaProxy(url, isSilent) {
-            const spinner = document.getElementById('refreshSpinner');
-            try {
-                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-                const res = await fetch(proxyUrl);
-                const csvText = await res.text();
-                
-                Papa.parse(csvText, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: function(results) {
-                        if (results.data && results.data.length > 0) {
-                            rawData = results.data;
-                            headers = results.meta.fields || Object.keys(rawData[0]);
-                            processDataAndRender();
-                            updateLastUpdatedTime();
-                            dismissAlert();
-                        } else {
-                            loadFallbackDemoData();
-                        }
-                        if(!isSilent && spinner) spinner.classList.remove('fa-spin');
-                    }
-                });
-            } catch(e) {
-                console.error("Proxy fetch failed:", e);
-                loadFallbackDemoData();
-                if(!isSilent && spinner) spinner.classList.remove('fa-spin');
-            }
+        // 전분기 대비 문자열의 방향 → good | bad | neutral
+        function deltaTone(kpi) {
+            const s = String(kpi.change || '');
+            if (!s || s === '–' || NEUTRAL.has(kpi.name)) return 'neutral';
+            if (s === '부호전환') return 'neutral';
+            const n = parseNum(s);
+            if (!n) return 'neutral';
+            const up = n > 0;
+            return (LOWER_IS_BETTER.has(kpi.name) ? !up : up) ? 'good' : 'bad';
+        }
+        function deltaBadge(kpi) {
+            const tone = deltaTone(kpi);
+            const n = parseNum(kpi.change);
+            const icon = !n ? 'fa-minus' : n > 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+            const word = { good: '개선', bad: '악화', neutral: '변동' }[tone];
+            return `<span class="delta delta--${tone}" title="${word}"><i class="fa-solid ${icon}"></i>${esc(signed(kpi.change || '–'))}</span>`;
         }
 
-        function processDataAndRender() {
-            if (!rawData || rawData.length === 0) return;
+        // 끝에서부터 조건을 만족하는 연속 분기 수 (null이면 끊김)
+        function trailingStreak(values, test) {
+            let n = 0;
+            for (let i = values.length - 1; i >= 0; i--) {
+                if (values[i] === null || !test(values[i], values[i - 1])) break;
+                n++;
+            }
+            return n;
+        }
 
-            // Classify Columns into Numeric vs Categorical
-            numericColumns = [];
-            categoricalColumns = [];
+        /* =============================================================
+           CSV → KPI 구조
+           "구분,KPI,단위,..." 행을 머리글로 찾고, 그 아래에서
+           A열만 있는 행 = 분류, B열이 있는 행 = KPI
+           ============================================================= */
+        function parseKpiCsv(text) {
+            const rows = Papa.parse(text.trim(), { skipEmptyLines: false }).data;
+            const h = rows.findIndex(r => (r[0] || '').trim() === '구분' && (r[1] || '').trim() === 'KPI');
+            if (h < 0) throw new Error('KPI 머리글 행을 찾지 못했습니다');
 
-            headers.forEach(header => {
-                let numericCount = 0;
-                let sampleSize = Math.min(rawData.length, 30);
-                
-                for (let i = 0; i < sampleSize; i++) {
-                    const val = rawData[i][header];
-                    if (val !== undefined && val !== null && val !== '') {
-                        const cleanVal = String(val).replace(/[\$,%,\s]/g, '');
-                        if (!isNaN(Number(cleanVal))) {
-                            numericCount++;
-                        }
-                    }
-                }
+            const head = rows[h].map(c => (c || '').trim());
+            const changeCol = head.findIndex(c => c.startsWith('전분기 대비'));
+            const qCols = head.map((c, i) => /분기$/.test(c) ? i : -1).filter(i => i >= 0 && i !== changeCol);
+            const formulaCol = head.indexOf('산식');
+            const noteCol = head.indexOf('비고');
 
-                if (numericCount >= sampleSize * 0.5) {
-                    numericColumns.push(header);
-                } else {
-                    categoricalColumns.push(header);
-                }
-            });
+            const out = [];
+            let section = '';
+            for (const r of rows.slice(h + 1)) {
+                const a = (r[0] || '').trim(), b = (r[1] || '').trim();
+                if (a && !b) { section = a; continue; }
+                if (!b) continue;
+                out.push({
+                    section,
+                    name: b,
+                    unit: (r[2] || '').trim(),
+                    values: qCols.map(i => parseNum(r[i])),
+                    change: (r[changeCol] || '').trim(),
+                    formula: (r[formulaCol] || '').trim(),
+                    note: (r[noteCol] || '').trim()
+                });
+            }
+            if (!out.some(k => k.name === '매출액')) throw new Error('매출액 행이 없습니다');
+            return { quarters: qCols.map(i => head[i]), kpis: out };
+        }
 
-            primaryCategoryCol = categoricalColumns[0] || headers[0];
+        /* ---------- 데이터 불러오기: 시트 → 실패 시 사본 ---------- */
+        async function loadData() {
+            const spinner = document.getElementById('refreshSpinner');
+            spinner.classList.add('fa-spin');
+            try {
+                const res = await fetch(KPI_CSV_URL + '&t=' + Date.now());
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                apply(parseKpiCsv(await res.text()));
+                const now = new Date();
+                const t = now.toTimeString().slice(0, 5);
+                setSource(true, `구글 시트 연동 · 오늘 ${t} 동기화`);
+                dismissAlert();
+            } catch (err) {
+                console.warn('시트 불러오기 실패, 사본 사용:', err);
+                apply(parseKpiCsv(KPI_SNAPSHOT));
+                setSource(false, `엑셀 사본 데이터 (${SNAPSHOT_DATE} 기준)`);
+                showError('구글 시트를 불러오지 못해 엑셀 기준 사본으로 표시합니다. 잠시 후 "시트 새로고침"을 눌러 보세요.');
+            } finally {
+                spinner.classList.remove('fa-spin');
+            }
+        }
+        function apply(parsed) {
+            quarters = parsed.quarters;
+            kpis = parsed.kpis;
+            renderAll();
+        }
+        function setSource(live, text) {
+            const dot = document.getElementById('liveDot');
+            dot.classList.toggle('pulse-live', live);
+            dot.classList.toggle('live-dot--off', !live);
+            document.getElementById('sourceText').textContent = text;
+        }
 
-            // Populate Main Metric Selection Dropdown
-            populateMetricDropdowns();
-
-            // Set chosen primary metric
-            const selectedDropdownVal = document.getElementById('primaryMetricSelect').value;
-            primaryNumericCol = selectedDropdownVal || numericColumns[0] || (headers.length > 1 ? headers[1] : headers[0]);
-            secondaryNumericCol = numericColumns[1] || numericColumns[0] || primaryNumericCol;
-
-            // Populate Category Filter
-            populateCategoryFilter();
-
-            filteredData = [...rawData];
-
-            // Render Dashboard Sections
+        function renderAll() {
             renderKPIs();
-            updateAll5Charts();
-            renderInsightsReport();
-            renderTable();
+            renderInsight();
+            renderStatus();
+            renderTrendCharts();
+            renderCompetitors();
+            populateSectionFilter();
+            renderKpiTable();
         }
 
-        function populateMetricDropdowns() {
-            const select = document.getElementById('primaryMetricSelect');
-            const currentVal = select.value;
-            select.innerHTML = '';
-            
-            if (numericColumns.length === 0) {
-                const opt = document.createElement('option');
-                opt.value = 'count';
-                opt.textContent = '레코드 건수';
-                select.appendChild(opt);
-                return;
-            }
-
-            numericColumns.forEach(col => {
-                const opt = document.createElement('option');
-                opt.value = col;
-                opt.textContent = col;
-                select.appendChild(opt);
-            });
-
-            if (currentVal && numericColumns.includes(currentVal)) {
-                select.value = currentVal;
-            } else {
-                select.value = numericColumns[0];
-            }
-        }
-
-        function populateCategoryFilter() {
-            const filterSelect = document.getElementById('categoryFilter');
-            filterSelect.innerHTML = '<option value="ALL">전체 범주 보기</option>';
-
-            if (!primaryCategoryCol) return;
-
-            const categories = [...new Set(rawData.map(item => item[primaryCategoryCol]))].filter(Boolean);
-            categories.slice(0, 30).forEach(cat => {
-                const opt = document.createElement('option');
-                opt.value = cat;
-                opt.textContent = cat;
-                filterSelect.appendChild(opt);
-            });
-        }
-
+        /* =============================================================
+           핵심 KPI 카드
+           ============================================================= */
         function renderKPIs() {
-            const kpiContainer = document.getElementById('kpiContainer');
-            kpiContainer.innerHTML = '';
+            const cards = [
+                { name: '매출액',            icon: 'fa-sack-dollar',      variant: 'kpi--records' },
+                { name: '영업이익률',        icon: 'fa-percent',          variant: 'kpi--sum' },
+                { name: '영업활동 현금흐름', icon: 'fa-money-bill-transfer', variant: 'kpi--avg' },
+                { name: '기말재고',          icon: 'fa-boxes-stacked',    variant: 'kpi--cats' }
+            ];
+            document.getElementById('kpiContainer').innerHTML = cards.map(c => {
+                const k = K(c.name);
+                return `
+                <div class="glass-panel kpi-card ${c.variant}">
+                    <div class="kpi-card__main">
+                        <span class="kpi-card__title">${esc(c.name)} · 4분기</span>
+                        <p class="kpi-card__value">${esc(fmt(last(k.values), k.unit))}</p>
+                        <div class="kpi-card__meta">${deltaBadge(k)}<span>3분기 ${esc(fmt(prev(k.values), k.unit))}</span></div>
+                    </div>
+                    <div class="kpi-card__icon"><i class="fa-solid ${c.icon}"></i></div>
+                </div>`;
+            }).join('');
+        }
 
-            const totalCount = rawData.length;
+        /* =============================================================
+           진단 요약 (값에 따라 문장 방향이 바뀜)
+           ============================================================= */
+        function renderInsight() {
+            const rev = K('매출액'), opm = K('영업이익률'), sga = K('판관비율');
+            const sold = K('판매량'), made = K('생산량'), stock = K('기말재고');
+            const cf = K('영업활동 현금흐름'), loan = K('긴급자금대출'), plan = K('매출 계획 달성률');
 
-            let metricSum = 0;
-            if (primaryNumericCol) {
-                metricSum = rawData.reduce((acc, curr) => {
-                    const num = parseFloat(String(curr[primaryNumericCol] || 0).replace(/[\$,%,\s]/g, ''));
-                    return acc + (isNaN(num) ? 0 : num);
-                }, 0);
+            const revUp = last(rev.values) >= prev(rev.values);
+            const opmDown = last(opm.values) < prev(opm.values);
+            const cfStreak = trailingStreak(cf.values, v => v < 0);
+
+            const parts = [];
+            parts.push(`4분기 매출은 <strong>${fmt(last(rev.values), '원')}</strong>으로 전분기보다 <strong>${esc(signed(rev.change))}</strong> ${revUp ? '늘었고' : '줄었고'}, 계획 대비 <strong>${fmt(last(plan.values), '%')}</strong>를 달성했습니다.`);
+            parts.push(`영업이익률은 <strong>${fmt(prev(opm.values), '%')} → ${fmt(last(opm.values), '%')}</strong>로 ${opmDown ? '떨어졌는데' : '올랐고'}, 판관비율이 <strong>${fmt(last(sga.values), '%')}</strong>${opmDown ? '까지 오른 것이 주원인입니다.' : '입니다.'}`);
+            if (last(made.values) > last(sold.values)) {
+                parts.push(`생산(${fmt(last(made.values), '개')})이 판매(${fmt(last(sold.values), '개')})보다 많아 기말재고가 <strong>${fmt(last(stock.values), '개')}</strong>로 쌓였습니다.`);
             }
+            if (last(cf.values) < 0) {
+                parts.push(`영업활동 현금흐름은 <strong>${fmt(last(cf.values), '원')}</strong>${cfStreak >= 2 ? `으로 ${cfStreak}분기 연속 적자` : ' 적자'}이고, 긴급자금대출 <strong>${fmt(last(loan.values), '원')}</strong>으로 버티고 있습니다.`);
+            }
+            document.getElementById('insightText').innerHTML = parts.join(' ');
+        }
 
-            const metricAvg = totalCount > 0 ? (metricSum / totalCount) : 0;
-            const uniqueCats = new Set(rawData.map(item => item[primaryCategoryCol])).size;
+        /* =============================================================
+           경고 지표 — 기준값으로 위험 / 주의 / 양호 판정
+           ============================================================= */
+        function buildStatus() {
+            const items = [];
+            const add = (level, kpiName, title, detail) => {
+                const k = K(kpiName);
+                items.push({ level, title, value: fmt(last(k.values), k.unit), detail });
+            };
 
-            const kpis = [
-                {
-                    title: '총 분석 레코드 수',
-                    value: totalCount.toLocaleString() + '건',
-                    icon: 'fa-database',
-                    badge: '전수 데이터',
-                    variant: 'kpi--records'
-                },
-                {
-                    title: `${primaryNumericCol} 누적 총합`,
-                    value: formatNumber(metricSum),
-                    icon: 'fa-calculator',
-                    badge: 'Sum Metric',
-                    variant: 'kpi--sum'
-                },
-                {
-                    title: `${primaryNumericCol} 산술 평균`,
-                    value: formatNumber(metricAvg),
-                    icon: 'fa-chart-line',
-                    badge: 'Average',
-                    variant: 'kpi--avg'
-                },
-                {
-                    title: '고유 범주 분류 그룹',
-                    value: uniqueCats.toLocaleString() + '개 그룹',
-                    icon: 'fa-layer-group',
-                    badge: 'Categories',
-                    variant: 'kpi--cats'
-                }
-            ];
+            const cf = K('영업활동 현금흐름').values;
+            if (last(cf) < 0) {
+                const n = trailingStreak(cf, v => v < 0);
+                add('critical', '영업활동 현금흐름', '영업 현금흐름 적자', n >= 2 ? `${n}분기 연속 적자 · 3분기 ${fmt(prev(cf), '원')}` : '이번 분기 적자 전환');
+            }
+            const loan = K('긴급자금대출');
+            if (last(loan.values) > 0) add('critical', '긴급자금대출', '긴급자금대출 발생', loan.note || '현금 부족으로 긴급자금 차입');
 
-            kpis.forEach(kpi => {
-                const card = document.createElement('div');
-                card.className = `glass-panel kpi-card ${kpi.variant}`;
-                card.innerHTML = `
-                    <div>
-                        <div class="title-row">
-                            <span class="kpi-card__title">${escapeHtml(kpi.title)}</span>
-                            <span class="kpi-card__badge">${kpi.badge}</span>
-                        </div>
-                        <p class="kpi-card__value">${kpi.value}</p>
+            const inv = K('재고 보유기간').values;
+            if (last(inv) >= 0.5) add(last(inv) >= 1 ? 'critical' : 'warning', '재고 보유기간', '재고 과다', `한 분기 판매량의 ${last(inv).toFixed(2)}배 · 3분기 ${prev(inv).toFixed(2)}배`);
+
+            const sell = K('판매율(소진율)').values;
+            if (last(sell) < 70) add(last(sell) < 50 ? 'critical' : 'warning', '판매율(소진율)', '판매율 저조', `판매가능량의 ${(100 - last(sell)).toFixed(1)}%가 재고로 남음 · 3분기 ${fmt(prev(sell), '%')}`);
+
+            const debt = K('부채비율').values;
+            if (last(debt) >= 60) add(last(debt) >= 100 ? 'critical' : 'warning', '부채비율', '부채비율 급등', `3분기 ${fmt(prev(debt), '%')}에서 ${(last(debt) - prev(debt)).toFixed(1)}%p 상승`);
+
+            const opm = K('영업이익률').values;
+            const opmStreak = trailingStreak(opm, (v, p) => p !== null && p !== undefined && v < p);
+            if (opmStreak >= 1) add('warning', '영업이익률', '영업이익률 하락', `${opmStreak}분기 연속 하락 · 2분기 ${fmt(opm[2], '%')}`);
+
+            const sga = K('판관비율').values;
+            if (last(sga) >= 50) add('warning', '판관비율', '판관비율 50% 초과', `매출의 절반 이상이 판관비 · 3분기 ${fmt(prev(sga), '%')}`);
+
+            const credit = K('신용등급').values;
+            if (last(credit) >= 5) add('warning', '신용등급', '신용등급 낮음', `2분기 ${fmt(credit[2], '등급')}에서 하락 (낮을수록 우수)`);
+
+            // 양호
+            const rev = K('매출액');
+            if (last(rev.values) > prev(rev.values)) add('good', '매출액', '매출 성장', `전분기 대비 ${signed(rev.change)}`);
+            const q = K('품질등급').values;
+            if (last(q) < prev(q)) add('good', '품질등급', '품질등급 개선', `3분기 ${fmt(prev(q), '등급')} → 4분기 (낮을수록 우수)`);
+            const gm = K('매출총이익률').values;
+            if (last(gm) >= prev(gm)) add('good', '매출총이익률', '매출총이익률 유지', `3분기 ${fmt(prev(gm), '%')} → 4분기`);
+
+            const order = { critical: 0, warning: 1, good: 2 };
+            return items.sort((a, b) => order[a.level] - order[b.level]);
+        }
+
+        function renderStatus() {
+            const items = buildStatus();
+            const meta = {
+                critical: { label: '위험', icon: 'fa-circle-exclamation' },
+                warning:  { label: '주의', icon: 'fa-triangle-exclamation' },
+                good:     { label: '양호', icon: 'fa-circle-check' }
+            };
+            document.getElementById('statusGrid').innerHTML = items.map(it => `
+                <div class="glass-panel status-card status--${it.level}">
+                    <div class="status-card__top">
+                        <span class="status-pill"><i class="fa-solid ${meta[it.level].icon}"></i>${meta[it.level].label}</span>
+                        <span class="status-card__title">${esc(it.title)}</span>
                     </div>
-                    <div class="kpi-card__icon">
-                        <i class="fa-solid ${kpi.icon}"></i>
-                    </div>
-                `;
-                kpiContainer.appendChild(card);
+                    <p class="status-card__value">${esc(it.value)}</p>
+                    <p class="status-card__detail">${esc(it.detail)}</p>
+                </div>`).join('');
+
+            const count = lvl => items.filter(i => i.level === lvl).length;
+            document.getElementById('statusCounts').innerHTML = ['critical', 'warning', 'good']
+                .map(l => `<span class="status-count status--${l}"><i class="fa-solid ${meta[l].icon}"></i>${meta[l].label} ${count(l)}</span>`).join('');
+            document.getElementById('insightBadge').textContent = `위험 ${count('critical')} · 주의 ${count('warning')}`;
+        }
+
+        /* =============================================================
+           차트 공통 (Chart.js 4) — 색은 dashboard.css 토큰에서 읽음
+           ============================================================= */
+        function baseOptions(yLabel, tickFmt) {
+            const text = css('--chart-text'), grid = css('--chart-grid');
+            const font = { size: 11, family: 'Pretendard Variable, Pretendard, sans-serif' };
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top', align: 'start', labels: { color: text, font, boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: 'rectRounded' } },
+                    tooltip: {
+                        backgroundColor: css('--tooltip-bg'), titleColor: css('--tooltip-text'), bodyColor: css('--tooltip-text'),
+                        borderColor: css('--tooltip-border'), borderWidth: 1, padding: 10, boxPadding: 4, usePointStyle: true,
+                        callbacks: { label: c => ` ${c.dataset.label}: ${c.raw === null ? '데이터 없음' : tickFmt(c.raw, true)}` }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false }, border: { color: grid }, ticks: { color: text, font } },
+                    y: { grid: { color: grid }, border: { display: false }, ticks: { color: text, font, callback: v => tickFmt(v) },
+                         title: { display: !!yLabel, text: yLabel, color: text, font } }
+                }
+            };
+        }
+        function lineDs(label, data, color, extra = {}) {
+            return { type: 'line', label, data, borderColor: color, backgroundColor: color, borderWidth: 2,
+                     pointRadius: 4, pointHoverRadius: 6, pointBorderColor: css('--chart-surface'), pointBorderWidth: 2,
+                     tension: 0, spanGaps: false, ...extra };
+        }
+        function barDs(label, data, color, extra = {}) {
+            return { type: 'bar', label, data, backgroundColor: color, borderRadius: 4, borderSkipped: 'start',
+                     borderColor: css('--chart-surface'), borderWidth: { left: 1, right: 1 }, maxBarThickness: 36, ...extra };
+        }
+        function draw(id, config) {
+            if (charts[id]) charts[id].destroy();
+            charts[id] = new Chart(document.getElementById(id), config);
+        }
+        const eok = v => v === null ? null : Math.round(v / 1e7) / 10;   // 원 → 억원 (소수 1자리)
+
+        function renderTrendCharts() {
+            const labels = quarters.map(shortQ);
+            const s = [css('--series-1'), css('--series-2'), css('--series-3'), css('--series-4')];
+            const fmtEokTick = (v, full) => (full ? v.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) : v.toLocaleString('ko-KR')) + '억';
+            const fmtPct = (v, full) => (full ? Number(v).toFixed(1) : v) + '%';
+            const fmtCnt = (v, full) => full ? v.toLocaleString('ko-KR') + '개' : (Math.abs(v) >= 1000 ? (v / 1000).toLocaleString('ko-KR') + 'k' : v);
+
+            // 1) 매출 실적 vs 계획 (억원)
+            const revenue = K('매출액').values.map(eok);
+            const plan = K('매출 계획 달성률').values.map((r, i) => (r === null || revenue[i] === null) ? null : Math.round(revenue[i] / (r / 100)));
+            draw('chartRevenue', {
+                data: { labels, datasets: [
+                    barDs('매출 실적', revenue, s[0]),
+                    lineDs('매출 계획', plan, s[1], { borderDash: [5, 4], pointStyle: 'rectRot' })
+                ] },
+                options: baseOptions('', fmtEokTick)
+            });
+
+            // 2) 수익성 비율 (%)
+            draw('chartMargin', {
+                data: { labels, datasets: [
+                    lineDs('매출총이익률', K('매출총이익률').values, s[0]),
+                    lineDs('영업이익률',   K('영업이익률').values,   s[1]),
+                    lineDs('순이익률',     K('순이익률').values,     s[2]),
+                    lineDs('판관비율',     K('판관비율').values,     s[3], { borderDash: [5, 4] })
+                ] },
+                options: baseOptions('', fmtPct)
+            });
+
+            // 3) 생산 · 판매 · 재고 (개)
+            draw('chartVolume', {
+                data: { labels, datasets: [
+                    lineDs('생산량',   K('생산량').values,   s[0]),
+                    lineDs('판매량',   K('판매량').values,   s[2]),
+                    lineDs('기말재고', K('기말재고').values, s[1])
+                ] },
+                options: baseOptions('', fmtCnt)
+            });
+
+            // 4) 현금흐름 · 긴급자금 (억원)
+            const cashOpts = baseOptions('', fmtEokTick);
+            cashOpts.scales.y.grid.color = ctx => ctx.tick.value === 0 ? css('--chart-zero') : css('--chart-grid');
+            draw('chartCash', {
+                data: { labels, datasets: [
+                    barDs('영업활동 현금흐름', K('영업활동 현금흐름').values.map(eok), s[1]),
+                    barDs('긴급자금대출',      K('긴급자금대출').values.map(eok),      s[3])
+                ] },
+                options: cashOpts
             });
         }
 
-        function updateAll5Charts() {
-            if (!rawData || rawData.length === 0) return;
-
-            const isDark = document.documentElement.classList.contains('dark');
-            const textColor = isDark ? '#cbd5e1' : '#475569';
-            const gridColor = isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(226, 232, 240, 0.8)';
-
-            // Prepare Aggregated Category Data
-            const catAgg = {};
-            rawData.forEach(item => {
-                const cat = item[primaryCategoryCol] || '기타';
-                let val = 1;
-                if (primaryNumericCol && item[primaryNumericCol] !== undefined) {
-                    const parsed = parseFloat(String(item[primaryNumericCol]).replace(/[\$,%,\s]/g, ''));
-                    val = isNaN(parsed) ? 0 : parsed;
-                }
-                catAgg[cat] = (catAgg[cat] || 0) + val;
+        /* =============================================================
+           경쟁사 비교
+           ============================================================= */
+        // 동점은 같은 순위 (1 + 우리보다 나은 회사 수)
+        function rankOf(key, higherBetter) {
+            const mine = COMPETITORS.find(c => c.name === SELF)[key];
+            return 1 + COMPETITORS.filter(c => higherBetter ? c[key] > mine : c[key] < mine).length;
+        }
+        function isTied(key) {
+            const mine = COMPETITORS.find(c => c.name === SELF)[key];
+            return COMPETITORS.some(c => c.name !== SELF && c[key] === mine);
+        }
+        const rankText = (key, higherBetter) => `${isTied(key) ? '공동 ' : ''}${rankOf(key, higherBetter)}위`;
+        function compChart(id, key, tickFmt) {
+            const self = css('--series-1'), other = css('--series-muted');
+            const opts = baseOptions('', tickFmt);
+            opts.indexAxis = 'y';
+            opts.interaction = { mode: 'nearest', axis: 'y', intersect: false };
+            opts.plugins.legend.display = false;
+            opts.scales = {
+                x: { grid: { color: css('--chart-grid') }, border: { display: false }, beginAtZero: true,
+                     ticks: { color: css('--chart-text'), font: { size: 11 }, callback: v => tickFmt(v) } },
+                y: { grid: { display: false }, border: { color: css('--chart-grid') },
+                     ticks: { color: css('--chart-text'), font: c => ({ size: 11, weight: COMPETITORS[c.index]?.name === SELF ? 700 : 400 }) } }
+            };
+            draw(id, {
+                type: 'bar',
+                data: {
+                    labels: COMPETITORS.map(c => c.name === SELF ? `${c.name} (우리)` : c.name),
+                    datasets: [{ label: '', data: COMPETITORS.map(c => +c[key].toFixed(2)),
+                                 backgroundColor: COMPETITORS.map(c => c.name === SELF ? self : other),
+                                 borderRadius: 4, borderSkipped: 'start', maxBarThickness: 22 }]
+                },
+                options: opts
             });
+        }
+        function renderCompetitors() {
+            const pct = (v, full) => (full ? Number(v).toFixed(1) : v) + '%';
+            compChart('chartCompShare', 'share', pct);
+            compChart('chartCompMargin', 'margin', pct);
+            compChart('chartCompStock', 'stockRatio', (v, full) => (full ? Number(v).toFixed(2) : v) + '분기');
+            document.getElementById('rankShare').textContent = `${rankText('share', true)} / 4`;
+            document.getElementById('rankMargin').textContent = `${rankText('margin', true)} / 4`;
+            document.getElementById('rankStock').textContent = `${rankText('stockRatio', false)} / 4`;
 
-            const topCategories = Object.entries(catAgg).sort((a,b) => b[1] - a[1]).slice(0, 10);
-            const labels1 = topCategories.map(c => c[0]);
-            const values1 = topCategories.map(c => c[1]);
-
-            // Dynamic Palette Colors
-            const palette = [
-                '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6',
-                '#3b82f6', '#14b8a6', '#f43f5e', '#84cc16', '#a855f7'
+            const rows = [
+                { label: '매출액',          key: 'revenue',    unit: '원', better: 'high' },
+                { label: '판매량',          key: 'units',      unit: '개', better: 'high' },
+                { label: '시장점유율',      key: 'share',      unit: '%',  better: 'high' },
+                { label: '순이익',          key: 'profit',     unit: '원', better: 'high' },
+                { label: '순이익률',        key: 'margin',     unit: '%',  better: 'high' },
+                { label: '기말재고',        key: 'stock',      unit: '개', better: 'low' },
+                { label: '재고/판매량',     key: 'stockRatio', unit: '분기', better: 'low' },
+                { label: '주가',            key: 'price',      unit: '원', better: 'high' },
+                { label: '신용등급',        key: 'credit',     unit: '등급', better: 'low' },
+                { label: '브랜드등급',      key: 'brand',      unit: '등급', better: 'low' },
+                { label: '품질등급',        key: 'quality',    unit: '등급', better: 'low' },
+                { label: '제품모델',        key: 'model',      unit: '번호', better: 'high' },
+                { label: '설비효율등급',    key: 'facility',   unit: '등급', better: 'low' },
+                { label: '영업직원 만족도', key: 'salesSat',   unit: '등급', better: 'low' },
+                { label: '생산직원 만족도', key: 'prodSat',    unit: '등급', better: 'low' },
+                { label: '연구개발비(추정)', key: 'rnd',       unit: '원', better: null }
             ];
-
-            // --- CHART 1: Vertical Bar Chart ---
-            const ctx1 = document.getElementById('chart1Bar').getContext('2d');
-            if (chart1BarInst) chart1BarInst.destroy();
-            chart1BarInst = new Chart(ctx1, {
-                type: 'bar',
-                data: {
-                    labels: labels1,
-                    datasets: [{
-                        label: primaryNumericCol,
-                        data: values1,
-                        backgroundColor: '#6366f1',
-                        hoverBackgroundColor: '#4f46e5',
-                        borderRadius: 8,
-                        borderSkipped: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } },
-                        y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } }
-                    }
-                }
-            });
-
-            // --- CHART 2: Gradient Area / Line Chart ---
-            const ctx2 = document.getElementById('chart2Line').getContext('2d');
-            if (chart2LineInst) chart2LineInst.destroy();
-
-            const lineSample = rawData.slice(0, 20);
-            const labels2 = lineSample.map((_, i) => `#${i + 1}`);
-            const values2 = lineSample.map(item => {
-                if (primaryNumericCol && item[primaryNumericCol] !== undefined) {
-                    const parsed = parseFloat(String(item[primaryNumericCol]).replace(/[\$,%,\s]/g, ''));
-                    return isNaN(parsed) ? 0 : parsed;
-                }
-                return 1;
-            });
-
-            const gradientFill = ctx2.createLinearGradient(0, 0, 0, 200);
-            gradientFill.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
-            gradientFill.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
-
-            chart2LineInst = new Chart(ctx2, {
-                type: 'line',
-                data: {
-                    labels: labels2,
-                    datasets: [{
-                        label: '시퀀스 흐름',
-                        data: values2,
-                        borderColor: '#10b981',
-                        borderWidth: 2.5,
-                        backgroundColor: gradientFill,
-                        fill: true,
-                        tension: 0.35,
-                        pointBackgroundColor: '#10b981',
-                        pointHoverRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } },
-                        y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } }
-                    }
-                }
-            });
-
-            // --- CHART 3: Horizontal Ranking Bar Chart ---
-            const ctx3 = document.getElementById('chart3HorizontalBar').getContext('2d');
-            if (chart3HorizInst) chart3HorizInst.destroy();
-
-            const top5Rank = topCategories.slice(0, 6);
-            chart3HorizInst = new Chart(ctx3, {
-                type: 'bar',
-                data: {
-                    labels: top5Rank.map(c => c[0]),
-                    datasets: [{
-                        label: '수치 점수',
-                        data: top5Rank.map(c => c[1]),
-                        backgroundColor: '#f59e0b',
-                        borderRadius: 6,
-                        indexAxis: 'y'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    indexAxis: 'y',
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } },
-                        y: { grid: { display: false }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } }
-                    }
-                }
-            });
-
-            // --- CHART 4: Doughnut Distribution Chart ---
-            const ctx4 = document.getElementById('chart4Doughnut').getContext('2d');
-            if (chart4DoughnutInst) chart4DoughnutInst.destroy();
-
-            chart4DoughnutInst = new Chart(ctx4, {
-                type: 'doughnut',
-                data: {
-                    labels: labels1.slice(0, 6),
-                    datasets: [{
-                        data: values1.slice(0, 6),
-                        backgroundColor: palette.slice(0, 6),
-                        borderWidth: 0,
-                        hoverOffset: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '68%',
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { boxWidth: 8, font: { size: 10, family: 'Pretendard' }, color: textColor }
-                        }
-                    }
-                }
-            });
-
-            // --- CHART 5: Multi-Metric / Dual Line-Bar Chart ---
-            const ctx5 = document.getElementById('chart5Multi').getContext('2d');
-            if (chart5MultiInst) chart5MultiInst.destroy();
-
-            // Calculate secondary metric dataset or generated secondary analysis
-            const secValues = topCategories.map((catEntry) => {
-                const subItems = rawData.filter(d => d[primaryCategoryCol] === catEntry[0]);
-                if (secondaryNumericCol && secondaryNumericCol !== primaryNumericCol) {
-                    const sumSec = subItems.reduce((acc, curr) => {
-                        const parsed = parseFloat(String(curr[secondaryNumericCol] || 0).replace(/[\$,%,\s]/g, ''));
-                        return acc + (isNaN(parsed) ? 0 : parsed);
-                    }, 0);
-                    return subItems.length > 0 ? (sumSec / subItems.length) : 0;
-                }
-                return subItems.length; // Fallback to record count per category
-            });
-
-            chart5MultiInst = new Chart(ctx5, {
-                type: 'bar',
-                data: {
-                    labels: labels1.slice(0, 7),
-                    datasets: [
-                        {
-                            type: 'bar',
-                            label: `${primaryNumericCol} (합계)`,
-                            data: values1.slice(0, 7),
-                            backgroundColor: '#8b5cf6',
-                            borderRadius: 6
-                        },
-                        {
-                            type: 'line',
-                            label: secondaryNumericCol && secondaryNumericCol !== primaryNumericCol ? `${secondaryNumericCol} (평균)` : '건수 수량',
-                            data: secValues.slice(0, 7),
-                            borderColor: '#ec4899',
-                            borderWidth: 2,
-                            pointBackgroundColor: '#ec4899',
-                            tension: 0.3
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: { boxWidth: 8, font: { size: 10, family: 'Pretendard' }, color: textColor }
-                        }
-                    },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } },
-                        y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10, family: 'Pretendard' } } }
-                    }
-                }
-            });
+            document.getElementById('compHead').innerHTML = `<tr><th>항목</th>${COMPETITORS.map(c =>
+                `<th class="num${c.name === SELF ? ' is-self' : ''}">${c.name === SELF ? 'B사 (우리)' : c.name}</th>`).join('')}<th class="num">B사 순위</th></tr>`;
+            document.getElementById('compBody').innerHTML = rows.map(r => {
+                const vals = COMPETITORS.map(c => c[r.key]);
+                const best = r.better === 'high' ? Math.max(...vals) : r.better === 'low' ? Math.min(...vals) : null;
+                const rank = r.better ? rankOf(r.key, r.better === 'high') : null;
+                return `<tr><td>${esc(r.label)}</td>${COMPETITORS.map(c => {
+                    const v = c[r.key];
+                    const cls = ['cell-num', c.name === SELF ? 'is-self' : '', v === best ? 'is-best' : ''].join(' ');
+                    return `<td class="${cls}">${esc(fmt(r.unit === '%' || r.unit === '분기' ? +v.toFixed(2) : v, r.unit))}</td>`;
+                }).join('')}<td class="cell-num">${rank ? `<span class="rank rank--${rank === 1 ? 'top' : rank === 4 ? 'low' : 'mid'}">${rankText(r.key, r.better === 'high')}</span>` : '–'}</td></tr>`;
+            }).join('');
         }
 
-        function renderInsightsReport() {
-            if (!rawData || rawData.length === 0) return;
-
-            let maxVal = -Infinity;
-            let maxItemName = '-';
-            let sum = 0;
-            let validCount = 0;
-
-            rawData.forEach(item => {
-                const name = item[primaryCategoryCol] || '항목';
-                if (primaryNumericCol && item[primaryNumericCol] !== undefined) {
-                    const parsed = parseFloat(String(item[primaryNumericCol]).replace(/[\$,%,\s]/g, ''));
-                    if (!isNaN(parsed)) {
-                        sum += parsed;
-                        validCount++;
-                        if (parsed > maxVal) {
-                            maxVal = parsed;
-                            maxItemName = name;
-                        }
-                    }
-                }
-            });
-
-            const avgVal = validCount > 0 ? (sum / validCount) : 0;
-            const concentrationPct = sum > 0 && maxVal > 0 ? Math.round((maxVal / sum) * 100) : 0;
-
-            document.getElementById('statMaxVal').textContent = maxVal !== -Infinity ? formatNumber(maxVal) : '-';
-            document.getElementById('statAvgVal').textContent = formatNumber(avgVal);
-            document.getElementById('statConcentration').textContent = concentrationPct + '%';
-
-            document.getElementById('insightText').innerHTML = `
-                전체 <strong>${rawData.length.toLocaleString()}건</strong>의 분석 데이터 중 가장 유의미한 최고 수치는 
-                <span class="insight__highlight">'${escapeHtml(maxItemName)}'</span> 항목에서 
-                <strong>${formatNumber(maxVal)}</strong>로 측정되었습니다. 
-                주요 Top 범주가 전체 데이터 수치 합계의 약 <strong>${concentrationPct}%</strong> 비중을 점유하고 있어 집중도가 관찰됩니다.
-            `;
+        /* =============================================================
+           전체 KPI 표
+           ============================================================= */
+        function populateSectionFilter() {
+            const sel = document.getElementById('sectionFilter');
+            const cur = sel.value;
+            const sections = [...new Set(kpis.map(k => k.section))];
+            sel.innerHTML = '<option value="ALL">전체 분류</option>' + sections.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+            if (sections.includes(cur)) sel.value = cur;
         }
+        function filteredKpis() {
+            const q = document.getElementById('searchInput').value.trim().toLowerCase();
+            const sec = document.getElementById('sectionFilter').value;
+            return kpis.filter(k => (sec === 'ALL' || k.section === sec) &&
+                (!q || [k.name, k.formula, k.note, k.section].some(v => v.toLowerCase().includes(q))));
+        }
+        function renderKpiTable() {
+            document.getElementById('kpiHead').innerHTML = `<tr><th>KPI</th>${quarters.map((q, i) =>
+                `<th class="num${i === quarters.length - 1 ? ' is-current' : ''}">${esc(shortQ(q))}</th>`).join('')}<th class="num">전분기 대비</th><th>산식 · 비고</th></tr>`;
 
-        function renderTable() {
-            const tableHead = document.getElementById('tableHead');
-            const tableBody = document.getElementById('tableBody');
-
-            if (!headers || headers.length === 0) return;
-
-            tableHead.innerHTML = `
-                <tr>
-                    <th>#</th>
-                    ${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}
-                </tr>
-            `;
-
-            const startIdx = (currentPage - 1) * pageSize;
-            const endIdx = startIdx + pageSize;
-            const pageData = filteredData.slice(startIdx, endIdx);
-
-            document.getElementById('filteredCount').textContent = filteredData.length.toLocaleString();
-            document.getElementById('totalRowCount').textContent = rawData.length.toLocaleString();
-
-            const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
-            document.getElementById('pageIndicator').textContent = `${currentPage} / ${totalPages}`;
-
-            document.getElementById('prevPageBtn').disabled = currentPage === 1;
-            document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
-
-            if (pageData.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="${headers.length + 1}" class="cell-empty">조건에 부합하는 데이터가 없습니다.</td></tr>`;
+            const list = filteredKpis();
+            if (!list.length) {
+                document.getElementById('kpiBody').innerHTML = `<tr><td colspan="${quarters.length + 3}" class="cell-empty">조건에 맞는 KPI가 없습니다.</td></tr>`;
                 return;
             }
-
-            tableBody.innerHTML = pageData.map((row, idx) => `
-                <tr>
-                    <td class="cell-index">${startIdx + idx + 1}</td>
-                    ${headers.map(h => {
-                        const val = row[h] !== undefined ? String(row[h]) : '';
-                        const isNum = !isNaN(Number(val.replace(/[\$,%,\s]/g, ''))) && val.trim() !== '';
-                        return `<td${isNum ? ' class="cell-num"' : ''}>${escapeHtml(val)}</td>`;
-                    }).join('')}
-                </tr>
-            `).join('');
+            let html = '', section = null;
+            for (const k of list) {
+                if (k.section !== section) {
+                    section = k.section;
+                    html += `<tr class="row-section"><td colspan="${quarters.length + 3}">${esc(section)}</td></tr>`;
+                }
+                html += `<tr>
+                    <td class="cell-kpi">${esc(k.name)}<span class="cell-unit">${esc(k.unit)}</span></td>
+                    ${k.values.map((v, i) => `<td class="cell-num${i === k.values.length - 1 ? ' is-current' : ''}${v === null ? ' is-empty' : ''}">${esc(fmt(v, k.unit))}</td>`).join('')}
+                    <td class="cell-num">${deltaBadge(k)}</td>
+                    <td class="cell-note">${esc(k.formula)}${k.note ? `<span class="cell-note__sub">${esc(k.note)}</span>` : ''}</td>
+                </tr>`;
+            }
+            document.getElementById('kpiBody').innerHTML = html;
         }
 
-        function filterTable() {
-            const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
-            const catVal = document.getElementById('categoryFilter').value;
-
-            filteredData = rawData.filter(row => {
-                if (catVal !== 'ALL' && row[primaryCategoryCol] !== catVal) {
-                    return false;
-                }
-                if (searchVal) {
-                    return Object.values(row).some(val => 
-                        String(val).toLowerCase().includes(searchVal)
-                    );
-                }
-                return true;
+        function exportCSV() {
+            const list = filteredKpis();
+            if (!list.length) { showError('내보낼 KPI가 없습니다.'); return; }
+            const data = list.map(k => {
+                const row = { 구분: k.section, KPI: k.name, 단위: k.unit };
+                quarters.forEach((q, i) => row[q] = k.values[i] ?? '');
+                return { ...row, '전분기 대비': k.change, 산식: k.formula, 비고: k.note };
             });
-
-            currentPage = 1;
-            renderTable();
+            const blob = new Blob(['﻿' + Papa.unparse(data)], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `4차년도_KPI_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a); a.click(); a.remove();
         }
 
-        function changePage(delta) {
-            const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
-            const newPage = currentPage + delta;
-            if (newPage >= 1 && newPage <= totalPages) {
-                currentPage = newPage;
-                renderTable();
-            }
+        /* ---------- 테마 · 알림 ---------- */
+        function toggleTheme() {
+            const dark = document.documentElement.classList.toggle('dark');
+            try { localStorage.setItem('dashboard-theme', dark ? 'dark' : 'light'); } catch (e) {}
         }
-
-        function exportFilteredCSV() {
-            if (!filteredData || filteredData.length === 0) {
-                showError("저장할 데이터가 없습니다.");
-                return;
-            }
-            const csv = Papa.unparse(filteredData);
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.setAttribute('href', url);
-            link.setAttribute('download', `analytics_export_${new Date().toISOString().slice(0, 10)}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        function toggleUrlModal() {
-            const modal = document.getElementById('urlModal');
-            document.getElementById('customUrlInput').value = currentCsvUrl;
-            modal.classList.toggle('hidden');
-        }
-
-        function saveCustomUrl() {
-            const newUrl = document.getElementById('customUrlInput').value.trim();
-            if (newUrl) {
-                currentCsvUrl = newUrl;
-                toggleUrlModal();
-                fetchSheetData();
-            }
-        }
-
-        function loadFallbackDemoData() {
-            headers = ['카테고리', '항목명', '수량', '금액(원)', '성공률(%)'];
-            rawData = [
-                { '카테고리': '전자기기', '항목명': '스마트폰 A', '수량': '125', '금액(원)': '1350000', '성공률(%)': '98' },
-                { '카테고리': '전자기기', '항목명': '노트북 Pro', '수량': '88', '금액(원)': '2800000', '성공률(%)': '94' },
-                { '카테고리': '생활가전', '항목명': '공기청정기', '수량': '160', '금액(원)': '450000', '성공률(%)': '91' },
-                { '카테고리': '생활가전', '항목명': '로봇청소기', '수량': '94', '금액(원)': '890000', '성공률(%)': '89' },
-                { '카테고리': '사무용품', '항목명': '모니터 암', '수량': '210', '금액(원)': '85000', '성공률(%)': '99' },
-                { '카테고리': '사무용품', '항목명': '모션데스크', '수량': '79', '금액(원)': '620000', '성공률(%)': '93' },
-                { '카테고리': '의류/패션', '항목명': '기능성 티셔츠', '수량': '340', '금액(원)': '35000', '성공률(%)': '96' },
-                { '카테고리': '의류/패션', '항목명': '경량 패딩', '수량': '185', '금액(원)': '129000', '성공률(%)': '92' }
-            ];
-            processDataAndRender();
-            updateLastUpdatedTime('데모 샘플 모드');
-        }
-
-        function updateLastUpdatedTime(prefix = '최근 동기화') {
-            const now = new Date();
-            const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-            document.getElementById('lastUpdatedText').textContent = `${prefix}: 오늘 ${timeStr}`;
-        }
-
-        function formatNumber(val) {
-            if (isNaN(val)) return val;
-            if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
-            if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
-            return Number(val.toFixed(1)).toLocaleString();
-        }
+        // 헤더 버튼이든 허브든 테마가 바뀌면 차트 색을 다시 그림
+        let wasDark = document.documentElement.classList.contains('dark');
+        new MutationObserver(() => {
+            const d = document.documentElement.classList.contains('dark');
+            if (d !== wasDark && kpis.length) { wasDark = d; renderTrendCharts(); renderCompetitors(); }
+        }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
         function showError(msg) {
-            const alertBox = document.getElementById('alertBox');
             document.getElementById('alertMessage').textContent = msg;
-            alertBox.classList.remove('hidden');
+            document.getElementById('alertBox').classList.remove('hidden');
         }
+        function dismissAlert() { document.getElementById('alertBox').classList.add('hidden'); }
 
-        function dismissAlert() {
-            document.getElementById('alertBox').classList.add('hidden');
-        }
-
-        function escapeHtml(text) {
-            if (text === null || text === undefined) return '';
-            return String(text)
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
+        loadData();
     </script>
 </body>
 </html>
