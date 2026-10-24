@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3C 분석</title>
+
+    <!-- 테마: 허브가 넘긴 ?theme= → 저장된 테마 → OS 설정 / 허브 안에서는 html.is-embedded -->
+    <script>
+        (function () {
+            const root = document.documentElement;
+            const params = new URLSearchParams(location.search);
+            let saved = null;
+            try { saved = localStorage.getItem('3c-theme'); } catch (e) {}
+            const fromHub = params.get('theme');
+            const dark = fromHub ? fromHub === 'dark' : saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+            if (dark) root.classList.add('dark');
+            if (window.self !== window.top || params.has('embed')) root.classList.add('is-embedded');
+            window.addEventListener('message', e => {
+                if (e.source === window.parent && e.data && e.data.type === 'hub-theme') root.classList.toggle('dark', !!e.data.dark);
+            });
+        })();
+    </script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="global.css">
+    <link rel="stylesheet" href="framework.css">
+    <style>
+        .stat-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+        .stat-chip { padding: 0.55rem 0.7rem; border-radius: var(--radius-lg); border: 1px solid var(--border-default); }
+        .stat-chip__label { font-size: var(--text-10); font-weight: 600; color: var(--text-tertiary); }
+        .stat-chip__value { font-size: var(--text-base); font-weight: 900; color: var(--text-primary); letter-spacing: -0.01em; }
+        .stat-chip__hint { font-size: var(--text-10); color: var(--text-secondary); }
+
+        /* 3C 관계도: 세 원이 겹치는 영역 = 전략 방향 */
+        .c3-map { display: flex; justify-content: center; }
+        .c3-map svg { width: 100%; max-width: 26rem; height: auto; }
+        .c3-map circle { fill-opacity: 0.12; stroke-width: 2; }
+        .c3-map text { font-family: inherit; fill: var(--text-primary); font-weight: 800; font-size: 15px; text-anchor: middle; }
+        .c3-map .sub { font-size: 11px; font-weight: 500; fill: var(--text-secondary); }
+
+        .ksf-layout { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+        @media (min-width: 1024px) { .ksf-layout { grid-template-columns: 22rem minmax(0, 1fr); } }
+        .ksf-block { display: flex; flex-direction: column; gap: 0.6rem; }
+        .ksf-block + .ksf-block { margin-top: 1rem; }
+        .ksf-block__title { font-size: var(--text-sm); font-weight: 700; color: var(--text-primary); display: flex; gap: 0.4rem; align-items: center; }
+    </style>
+</head>
+<body class="page-fw">
+
+    <header class="app-header">
+        <div class="app-header__inner">
+            <div class="app-header__brand">
+                <div class="brand-group">
+                    <div class="logo-mark"><i class="fa-solid fa-circle-nodes"></i></div>
+                    <div>
+                        <div class="title-row">
+                            <h1 class="app-title">3C 분석</h1>
+                            <span class="pill-badge">B사 · 4차년도 4분기</span>
+                        </div>
+                        <p class="app-subtitle">자사(Company) · 경쟁사(Competitor) · 고객·시장(Customer) → 핵심 성공 요인</p>
+                    </div>
+                </div>
+                <button class="theme-toggle-mobile" onclick="FW.toggleTheme()" aria-label="테마 전환">
+                    <i class="fa-solid fa-moon icon-moon"></i><i class="fa-solid fa-sun icon-sun"></i>
+                </button>
+            </div>
+            <div class="header-controls">
+                <span id="saveStatus" class="save-status"></span>
+                <button class="btn btn-secondary" onclick="FW.copyMarkdown()" title="마크다운으로 복사"><i class="fa-solid fa-copy"></i><span class="btn__label">복사</span></button>
+                <button class="btn btn-secondary" onclick="FW.reset()" title="초안으로 되돌리기"><i class="fa-solid fa-rotate-left"></i><span class="btn__label">초기화</span></button>
+                <button class="btn btn-secondary" onclick="window.print()" title="인쇄 / PDF 저장"><i class="fa-solid fa-print"></i></button>
+                <button class="theme-toggle" onclick="FW.toggleTheme()" aria-label="테마 전환">
+                    <i class="fa-solid fa-moon icon-moon"></i><i class="fa-solid fa-sun icon-sun"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="app-main">
+        <section class="glass-panel fw-intro">
+            <p class="fw-intro__text">
+                위쪽 숫자 카드는 엑셀 값 그대로이고, 아래 목록은 그 숫자를 해석한 <strong>초안</strong>입니다.
+                항목을 눌러 고치고 <kbd>Enter</kbd>로 추가하세요. 내용은 이 브라우저에 자동 저장됩니다.
+            </p>
+            <div class="fw-legend">
+                <span class="src-tag src-tag--data">데이터</span> 엑셀·보고서 수치 근거
+                <span class="src-tag src-tag--assume">가정</span> 해석·추정 (눌러서 전환)
+            </div>
+        </section>
+
+        <section class="fw-grid-3" id="cards"></section>
+
+        <section class="glass-panel panel">
+            <div class="panel__header">
+                <div>
+                    <h2 class="panel__title"><i class="fa-solid fa-key"></i> 핵심 성공 요인과 전략 방향</h2>
+                    <p class="panel__desc">고객이 원하고, 경쟁사가 못 하고, 우리가 할 수 있는 영역을 찾습니다.</p>
+                </div>
+            </div>
+            <div class="ksf-layout">
+                <div class="c3-map" aria-hidden="true">
+                    <svg viewBox="0 0 320 290">
+                        <circle cx="160" cy="105" r="88" style="fill: var(--series-3); stroke: var(--series-3)"></circle>
+                        <circle cx="105" cy="190" r="88" style="fill: var(--series-1); stroke: var(--series-1)"></circle>
+                        <circle cx="215" cy="190" r="88" style="fill: var(--series-2); stroke: var(--series-2)"></circle>
+                        <text x="160" y="58">Customer</text><text x="160" y="74" class="sub">고객이 원하는 것</text>
+                        <text x="70" y="228">Company</text><text x="70" y="244" class="sub">우리가 할 수 있는 것</text>
+                        <text x="250" y="228">Competitor</text><text x="250" y="244" class="sub">경쟁사가 하는 것</text>
+                        <text x="160" y="160" style="font-size:12px">전략</text><text x="160" y="175" class="sub">기회 영역</text>
+                    </svg>
+                </div>
+                <div>
+                    <div class="ksf-block tone-1">
+                        <div class="ksf-block__title"><i class="fa-solid fa-key"></i> 핵심 성공 요인 (KSF)</div>
+                        <div id="ksf"></div>
+                    </div>
+                    <div class="ksf-block tone-1">
+                        <div class="ksf-block__title"><i class="fa-solid fa-compass"></i> 전략 방향 한 문장</div>
+                        <div id="direction"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="app-footer">출처: 경영성과_KPI_4차년도 (KPI 요약 · 경쟁사 비교 · 원데이터 · 1분기 경영목표) · STP 전략 페이지</footer>
+
+    <script src="framework.js"></script>
+    <script>
+        const D = 'data', A = 'assume';
+
+        // 숫자 카드 — 엑셀 값 (편집 대상 아님)
+        const STATS = {
+            company: [
+                { label: '매출 (4Q)', value: '2,216억', hint: '전분기 +32.8%' },
+                { label: '시장점유율', value: '30.0%', hint: '4개사 중 2위' },
+                { label: '영업이익률', value: '7.8%', hint: '3Q 12.3%' },
+                { label: '재고 / 판매량', value: '1.30분기', hint: '311,008개' }
+            ],
+            competitor: [
+                { label: 'A사 점유율', value: '33.5%', hint: '순이익률 19.8%' },
+                { label: 'C사 점유율', value: '18.8%', hint: '순이익률 11.9%' },
+                { label: 'D사 점유율', value: '17.7%', hint: '순이익률 8.4%' },
+                { label: '경쟁사 재고/판매', value: '0.02~0.29', hint: 'B사 1.30' }
+            ],
+            customer: [
+                { label: '시장 규모 (추정)', value: '7,385억', hint: '전분기 +34.9%' },
+                { label: '평균 판매가', value: '927,843원', hint: '3Y4Q 682,517원' },
+                { label: '인당 판매량 (4Q)', value: '한 421', hint: '미 234 · 중 363' },
+                { label: '가격 인상 반응 (1Q)', value: '한 −29%', hint: '미 −63% 판매 급감' }
+            ]
+        };
+
+        const DEFAULTS = {
+            lists: {
+                company: [
+                    { t: '매출 성장세(1Q 786억 → 4Q 2,216억)와 점유율 2위(30.0%) 확보', src: D },
+                    { t: '매출총이익률 62.2%로 원가 경쟁력은 있으나 판관비율 54.4%가 이익을 잠식', src: D },
+                    { t: '생산을 판매보다 많이 해 기말재고 311,008개, 판매율 43.4%', src: D },
+                    { t: '영업활동 현금흐름 −703억, 긴급자금대출 408억, 부채비율 87.3%', src: D },
+                    { t: '품질 2등급·브랜드 2등급은 강점, 제품모델 5·연구개발비 48억은 경쟁사 대비 열위', src: D }
+                ],
+                competitor: [
+                    { t: 'A사(리더): 매출 2,797억, 점유율 33.5%, 모델 7, 모든 등급 1등급 — 품질·제품·재무 전방위 우위', src: D },
+                    { t: 'C사: 순이익률 11.9%, 설비효율 2등급, 연구개발비 76억(추정)으로 제품 투자에 적극적', src: D },
+                    { t: 'D사: 기말재고 3,345개(재고/판매 0.02)로 재고 관리 최우수, 품질 5등급은 약점', src: D },
+                    { t: '경쟁사들은 판매량에 맞춰 생산 — B사만 재고가 한 분기 판매분을 넘음', src: D },
+                    { t: 'C·D사 모두 모델 6으로 B사(모델 5)보다 사양 우위 — 가격만으로는 차별화가 어려움', src: A }
+                ],
+                customer: [
+                    { t: '4개사 과점 시장, 규모 추정 7,385억으로 전분기 대비 +34.9% 성장', src: D },
+                    { t: '가격 민감도가 높음 — 1분기 가격 인상 때 한국 −29%, 미국 −63% 판매 감소', src: D },
+                    { t: '평균 판매가는 분기마다 상승(682,517원 → 927,843원), 가격 수용 한계 확인 필요', src: A },
+                    { t: '국가별 인당 판매량: 한국 421 · 미국 234(상승) · 중국 363(2Q 702에서 하락)', src: D },
+                    { t: '모델·품질 등급이 높은 A사가 점유율 1위 — 고객은 제품 사양을 중시', src: A }
+                ],
+                ksf: [
+                    { t: '재고 회전: 생산을 판매에 맞춰 판매율 80% 이상 회복', src: A },
+                    { t: '비용 구조: 광고·판촉 효율화로 판관비율 40%대 복귀', src: A },
+                    { t: '제품 경쟁력: 모델 6 이상 신모델로 A·C·D사와 격차 해소', src: A },
+                    { t: '가격: 국가별 가격 탄력성을 반영한 가격 책정 (실속형 세그먼트)', src: A }
+                ]
+            },
+            notes: {
+                direction: '성장하는 시장에서 재고·비용을 먼저 정상화해 현금을 확보하고, 그 현금으로 신모델에 투자해 A사와의 점유율 격차를 좁힌다.'
+            }
+        };
+
+        const CARDS = [
+            { id: 'company', name: '자사', en: 'Company', tone: 1, icon: 'fa-building', sub: 'B사의 성과와 역량' },
+            { id: 'competitor', name: '경쟁사', en: 'Competitor', tone: 2, icon: 'fa-chess-knight', sub: 'A · C · D사 (4분기)' },
+            { id: 'customer', name: '고객 · 시장', en: 'Customer', tone: 3, icon: 'fa-users', sub: '시장 규모와 고객 반응' }
+        ];
+
+        function render() {
+            document.getElementById('cards').innerHTML = CARDS.map(c => `
+                <article class="glass-panel fw-card tone-${c.tone}">
+                    <div class="fw-card__head">
+                        <span class="fw-card__badge"><i class="fa-solid ${c.icon}" style="font-size:1rem"></i></span>
+                        <div>
+                            <div class="fw-card__title">${c.name} <span class="fw-card__sub">${c.en}</span></div>
+                            <div class="fw-card__sub">${c.sub}</div>
+                        </div>
+                    </div>
+                    <div class="stat-chips">${STATS[c.id].map(s => `
+                        <div class="stat-chip">
+                            <div class="stat-chip__label">${FW.esc(s.label)}</div>
+                            <div class="stat-chip__value">${FW.esc(s.value)}</div>
+                            <div class="stat-chip__hint">${FW.esc(s.hint)}</div>
+                        </div>`).join('')}
+                    </div>
+                    ${FW.list(c.id, `${c.name} 분석 입력`)}
+                </article>`).join('');
+            document.getElementById('ksf').innerHTML = FW.list('ksf', '핵심 성공 요인 입력');
+            document.getElementById('direction').innerHTML = FW.note('direction', '전략 방향을 한 문장으로');
+        }
+
+        function toMarkdown(s) {
+            const cards = CARDS.map(c => `## ${c.name} (${c.en})\n${FW.mdList(c.id)}`).join('\n\n');
+            return `# B사 3C 분석 (4차년도 4분기)\n\n${cards}\n\n## 핵심 성공 요인\n${FW.mdList('ksf')}\n\n## 전략 방향\n${s.notes.direction || ''}\n`;
+        }
+
+        FW.init({ key: '3c-v1', themeKey: '3c-theme', defaults: DEFAULTS, render, toMarkdown });
+    </script>
+</body>
+</html>

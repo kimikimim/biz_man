@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SWOT 분석</title>
+
+    <!-- 테마: 허브가 넘긴 ?theme= → 저장된 테마 → OS 설정 / 허브 안에서는 html.is-embedded -->
+    <script>
+        (function () {
+            const root = document.documentElement;
+            const params = new URLSearchParams(location.search);
+            let saved = null;
+            try { saved = localStorage.getItem('swot-theme'); } catch (e) {}
+            const fromHub = params.get('theme');
+            const dark = fromHub ? fromHub === 'dark' : saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+            if (dark) root.classList.add('dark');
+            if (window.self !== window.top || params.has('embed')) root.classList.add('is-embedded');
+            window.addEventListener('message', e => {
+                if (e.source === window.parent && e.data && e.data.type === 'hub-theme') root.classList.toggle('dark', !!e.data.dark);
+            });
+        })();
+    </script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="global.css">
+    <link rel="stylesheet" href="framework.css">
+    <style>
+        /* SWOT 2×2 + 축 라벨 */
+        .swot { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+        @media (min-width: 900px) {
+            .swot { grid-template-columns: 2.25rem repeat(2, minmax(0, 1fr)); grid-template-rows: auto repeat(2, auto); }
+            .swot__axis { display: flex !important; }
+        }
+        .swot__axis {
+            display: none; align-items: center; justify-content: center;
+            font-size: var(--text-11); font-weight: 800; letter-spacing: 0.08em; color: var(--text-tertiary);
+        }
+        .swot__axis--top { padding-bottom: 0.1rem; }
+        .swot__axis--side { writing-mode: vertical-rl; transform: rotate(180deg); }
+        .swot__corner { display: none; }
+        @media (min-width: 900px) { .swot__corner { display: block; } }
+
+        .tows { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+        @media (min-width: 768px) { .tows { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        .tows-card { padding: 1rem 1.1rem; border-radius: var(--radius-xl); border: 1px solid var(--border-default); display: flex; flex-direction: column; gap: 0.6rem; }
+        .tows-card__head { display: flex; align-items: center; gap: 0.5rem; }
+        .tows-card__key { font-size: var(--text-xs); font-weight: 900; padding: 0.1rem 0.45rem; border-radius: var(--radius-md); background: var(--bg-muted); color: var(--text-primary); }
+        .tows-card__title { font-size: var(--text-sm); font-weight: 700; color: var(--text-primary); }
+        .tows-card__desc { font-size: var(--text-11); color: var(--text-tertiary); }
+    </style>
+</head>
+<body class="page-fw">
+
+    <header class="app-header">
+        <div class="app-header__inner">
+            <div class="app-header__brand">
+                <div class="brand-group">
+                    <div class="logo-mark"><i class="fa-solid fa-table-cells-large"></i></div>
+                    <div>
+                        <div class="title-row">
+                            <h1 class="app-title">SWOT 분석</h1>
+                            <span class="pill-badge">B사 · 4차년도 4분기</span>
+                        </div>
+                        <p class="app-subtitle">강점 · 약점 · 기회 · 위협과 교차 전략 (SO · WO · ST · WT)</p>
+                    </div>
+                </div>
+                <button class="theme-toggle-mobile" onclick="FW.toggleTheme()" aria-label="테마 전환">
+                    <i class="fa-solid fa-moon icon-moon"></i><i class="fa-solid fa-sun icon-sun"></i>
+                </button>
+            </div>
+            <div class="header-controls">
+                <span id="saveStatus" class="save-status"></span>
+                <button class="btn btn-secondary" onclick="FW.copyMarkdown()" title="마크다운으로 복사"><i class="fa-solid fa-copy"></i><span class="btn__label">복사</span></button>
+                <button class="btn btn-secondary" onclick="FW.reset()" title="초안으로 되돌리기"><i class="fa-solid fa-rotate-left"></i><span class="btn__label">초기화</span></button>
+                <button class="btn btn-secondary" onclick="window.print()" title="인쇄 / PDF 저장"><i class="fa-solid fa-print"></i></button>
+                <button class="theme-toggle" onclick="FW.toggleTheme()" aria-label="테마 전환">
+                    <i class="fa-solid fa-moon icon-moon"></i><i class="fa-solid fa-sun icon-sun"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="app-main">
+        <section class="glass-panel fw-intro">
+            <p class="fw-intro__text">
+                4차년도 KPI·경쟁사 비교·1분기 보고서 수치로 채운 <strong>초안</strong>입니다. 항목을 눌러 바로 고치고,
+                <kbd>Enter</kbd>로 다음 항목을 추가하세요. 내용은 이 브라우저에 자동 저장됩니다.
+            </p>
+            <div class="fw-legend">
+                <span class="src-tag src-tag--data">데이터</span> 엑셀·보고서 수치 근거
+                <span class="src-tag src-tag--assume">가정</span> 해석·추정 (눌러서 전환)
+            </div>
+        </section>
+
+        <section class="swot" id="swot"></section>
+
+        <section class="glass-panel panel">
+            <div class="panel__header">
+                <div>
+                    <h2 class="panel__title"><i class="fa-solid fa-shuffle"></i> 교차 전략 (TOWS)</h2>
+                    <p class="panel__desc">내부(강점·약점)와 외부(기회·위협)를 짝지어 실행 전략을 정리합니다.</p>
+                </div>
+            </div>
+            <div class="tows" id="tows"></div>
+        </section>
+    </main>
+
+    <footer class="app-footer">출처: 경영성과_KPI_4차년도 (KPI 요약 · 경쟁사 비교) · B사 4차년도 1분기 경영성과 총괄 보고 · STP 전략 페이지</footer>
+
+    <script src="framework.js"></script>
+    <script>
+        const D = 'data', A = 'assume';
+        const DEFAULTS = {
+            lists: {
+                S: [
+                    { t: '매출 2,216억, 전분기 대비 +32.8% — 1분기(786억) 이후 3분기 연속 성장', src: D },
+                    { t: '시장점유율 30.0%로 4개사 중 2위, 1위 A사(33.5%)와 3.5%p 차이', src: D },
+                    { t: '매출총이익률 62.2% — 2분기 50.9%에서 꾸준히 상승', src: D },
+                    { t: '품질등급 4→2등급, 브랜드등급 3→2등급으로 개선 (경쟁사 중 A사 다음)', src: D },
+                    { t: '분기 생산량 14.5만 → 38.2만 개로 생산 능력 확대 (2Q→4Q)', src: D }
+                ],
+                W: [
+                    { t: '기말재고 311,008개 = 한 분기 판매량의 1.30배 (경쟁사 0.02~0.29배)', src: D },
+                    { t: '판관비율 54.4% → 영업이익률 7.8%, 순이익률 6.4%로 4개사 중 최하위', src: D },
+                    { t: '영업활동 현금흐름 −703억, 2분기 연속 적자 · 기말 현금 0원', src: D },
+                    { t: '부채비율 35.1% → 87.3%, 신용등급 6등급 (2분기 1등급)', src: D },
+                    { t: '제품모델 5로 경쟁사(A사 7, C·D사 6)보다 낮음', src: D },
+                    { t: '영업직원 생산성등급 6.33으로 악화, 영업직원 만족도 4등급', src: D }
+                ],
+                O: [
+                    { t: '시장 규모 추정 7,385억 — 전분기 대비 +34.9% 성장 (매출 ÷ 점유율로 추정)', src: D },
+                    { t: '실속형(저가) 세그먼트 공략 여지 — STP 분석 기준, 4분기 경쟁사 모델 변화(C·D사 모델 6) 반영 필요', src: A },
+                    { t: '미국 인당 판매량 93 → 234개로 상승세 (2Q→4Q)', src: D },
+                    { t: 'C·D사는 점유율 17~19%, 신용등급 6등급으로 추격 여력이 제한적', src: A }
+                ],
+                T: [
+                    { t: 'A사가 점유율 33.5%, 순이익률 19.8%, 모델 7, 신용 1등급으로 전 지표 우위', src: D },
+                    { t: '경쟁사 모델 업그레이드(C·D사 모델 6)로 제품 격차 확대', src: D },
+                    { t: '가격에 민감한 수요 — 1분기 가격 인상 때 한국 −29%, 미국 −63% 판매 급감', src: D },
+                    { t: '재고 처분을 위한 가격 인하가 가격 경쟁을 키울 수 있음', src: A },
+                    { t: '신용등급 하락으로 추가 자금 조달 비용 상승', src: A }
+                ],
+                SO: [
+                    { t: '시장 성장기에 품질·브랜드 개선을 앞세워 점유율 1위(A사와 3.5%p) 도전', src: A },
+                    { t: '늘어난 생산 능력을 성장 중인 미국 시장 판매 확대에 배분', src: A }
+                ],
+                WO: [
+                    { t: '실속형 세그먼트로 가격 재포지셔닝해 재고 311,008개 소진', src: A },
+                    { t: '시장 성장분을 신규 생산이 아닌 재고 판매로 흡수 → 발주·생산 축소', src: A }
+                ],
+                ST: [
+                    { t: '연구개발비(48억) 증액으로 모델 6 이상 신모델 조기 출시, A사와 제품 격차 축소', src: A },
+                    { t: '품질 2등급 강점을 내세워 가격 인하 없이 가치 소구', src: A }
+                ],
+                WT: [
+                    { t: '광고·판촉비(721억) 효율화로 판관비율 40%대 복귀, 현금흐름 흑자 전환', src: A },
+                    { t: '매출채권(886억) 회수 기간 단축으로 긴급자금(408억) 의존 해소', src: A }
+                ]
+            },
+            notes: {}
+        };
+
+        const QUADS = [
+            { id: 'S', name: '강점', en: 'Strengths', tone: 1, icon: 'S', sub: '내부 · 도움이 되는 요인' },
+            { id: 'W', name: '약점', en: 'Weaknesses', tone: 2, icon: 'W', sub: '내부 · 해가 되는 요인' },
+            { id: 'O', name: '기회', en: 'Opportunities', tone: 3, icon: 'O', sub: '외부 · 도움이 되는 요인' },
+            { id: 'T', name: '위협', en: 'Threats', tone: 4, icon: 'T', sub: '외부 · 해가 되는 요인' }
+        ];
+        const TOWS = [
+            { id: 'SO', title: '강점으로 기회 잡기', desc: '공격 전략' },
+            { id: 'WO', title: '기회로 약점 보완', desc: '전환 전략' },
+            { id: 'ST', title: '강점으로 위협 막기', desc: '다각화·방어 전략' },
+            { id: 'WT', title: '약점·위협 최소화', desc: '방어·축소 전략' }
+        ];
+
+        function card(q) {
+            const n = (FW.state.lists[q.id] || []).length;
+            return `
+                <article class="glass-panel fw-card tone-${q.tone}">
+                    <div class="fw-card__head">
+                        <span class="fw-card__badge">${q.icon}</span>
+                        <div>
+                            <div class="fw-card__title">${q.name} <span class="fw-card__sub">${q.en}</span></div>
+                            <div class="fw-card__sub">${q.sub} · ${n}개</div>
+                        </div>
+                    </div>
+                    ${FW.list(q.id, `${q.name} 입력`)}
+                </article>`;
+        }
+
+        function render() {
+            const [S, W, O, T] = QUADS.map(card);
+            document.getElementById('swot').innerHTML = `
+                <div class="swot__corner"></div>
+                <div class="swot__axis swot__axis--top">도움이 되는 요인</div>
+                <div class="swot__axis swot__axis--top">해가 되는 요인</div>
+                <div class="swot__axis swot__axis--side">내부 · 자사</div>${S}${W}
+                <div class="swot__axis swot__axis--side">외부 · 환경</div>${O}${T}`;
+
+            document.getElementById('tows').innerHTML = TOWS.map(t => `
+                <div class="tows-card">
+                    <div class="tows-card__head">
+                        <span class="tows-card__key">${t.id}</span>
+                        <span class="tows-card__title">${t.title}</span>
+                        <span class="tows-card__desc">${t.desc}</span>
+                    </div>
+                    ${FW.list(t.id, '전략 입력')}
+                </div>`).join('');
+        }
+
+        function toMarkdown() {
+            const quads = QUADS.map(q => `## ${q.name} (${q.en})\n${FW.mdList(q.id)}`).join('\n\n');
+            const tows = TOWS.map(t => `### ${t.id} · ${t.title}\n${FW.mdList(t.id)}`).join('\n\n');
+            return `# B사 SWOT 분석 (4차년도 4분기)\n\n${quads}\n\n## 교차 전략 (TOWS)\n\n${tows}\n`;
+        }
+
+        FW.init({ key: 'swot-v1', themeKey: 'swot-theme', defaults: DEFAULTS, render, toMarkdown });
+    </script>
+</body>
+</html>
