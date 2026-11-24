@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>4차년도 성과 대시보드</title>
+    <title>경영성과 대시보드</title>
 
     <!-- 테마 깜빡임 방지 + 허브 임베드 감지
          테마 우선순위: 허브가 넘긴 ?theme= → 저장된 테마 → OS 설정
@@ -34,6 +34,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <!-- SheetJS: 엑셀 파일을 통째로 받아 탭 이름으로 읽음 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.mini.min.js"></script>
 
     <!-- 공통 디자인 시스템 + 페이지 전용 스타일 -->
     <link rel="stylesheet" href="global.css">
@@ -51,7 +53,7 @@
                     <div class="logo-mark"><i class="fa-solid fa-chart-line"></i></div>
                     <div>
                         <div class="title-row">
-                            <h1 class="app-title">4차년도 성과 대시보드</h1>
+                            <h1 class="app-title">경영성과 대시보드</h1>
                             <span class="pill-badge">B사 · KPI</span>
                         </div>
                         <p class="app-subtitle">
@@ -102,7 +104,7 @@
         </div>
 
         <!-- ---------- 핵심 KPI 4종 (4분기, 전분기 대비) ---------- -->
-        <section id="kpiContainer" class="kpi-grid" aria-label="4분기 핵심 지표">
+        <section id="kpiContainer" class="kpi-grid" aria-label="최신 분기 핵심 지표">
             <div class="glass-panel skeleton-card animate-pulse"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--value"></div></div>
             <div class="glass-panel skeleton-card animate-pulse"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--value"></div></div>
             <div class="glass-panel skeleton-card animate-pulse"><div class="skeleton-line skeleton-line--title"></div><div class="skeleton-line skeleton-line--value"></div></div>
@@ -115,10 +117,10 @@
             <div class="insight__inner">
                 <div class="insight__content">
                     <div class="insight__labels">
-                        <span class="insight__label"><i class="fa-solid fa-clipboard-check"></i>4분기 진단</span>
+                        <span class="insight__label"><i class="fa-solid fa-clipboard-check"></i><span id="insightLabel">최근 분기 진단</span></span>
                         <span id="insightBadge" class="insight__status"></span>
                     </div>
-                    <h3 class="insight__title">매출은 늘었지만 이익·현금·재고는 나빠졌어요</h3>
+                    <h3 class="insight__title" id="insightTitle">진단 중…</h3>
                     <p id="insightText" class="insight__text">데이터를 불러오면 요약이 표시됩니다.</p>
                 </div>
             </div>
@@ -128,7 +130,7 @@
         <div class="section-heading">
             <div>
                 <h2 class="section-heading__title"><i class="fa-solid fa-triangle-exclamation"></i> 경고 지표</h2>
-                <p class="section-heading__desc">4분기 값 기준 자동 판정 · 위험 / 주의 / 양호</p>
+                <p class="section-heading__desc" id="statusDesc">최신 분기 값 기준 자동 판정 · 위험 / 주의 / 양호</p>
             </div>
             <div id="statusCounts" class="status-counts"></div>
         </div>
@@ -138,7 +140,7 @@
         <div class="section-heading">
             <div>
                 <h2 class="section-heading__title"><i class="fa-solid fa-chart-column"></i> 분기별 추이</h2>
-                <p class="section-heading__desc">3차년도 4분기 → 4차년도 4분기 · 빈 칸은 원본 데이터 없음</p>
+                <p class="section-heading__desc" id="trendDesc">빈 칸은 원본 데이터 없음</p>
             </div>
         </div>
 
@@ -188,11 +190,82 @@
             </div>
         </section>
 
+        <!-- ---------- 재무비율 분석 ---------- -->
+        <div class="section-heading" id="finance">
+            <div>
+                <h2 class="section-heading__title"><i class="fa-solid fa-scale-balanced"></i> 재무비율 분석</h2>
+                <p class="section-heading__desc">재무제표 탭 기준 · 분기 실적 그대로 계산(연환산 아님) · 비율에 마우스를 올리면 산식 표시</p>
+            </div>
+            <div class="fin-controls">
+                <label class="fin-controls__label" for="finQuarter">기준 분기</label>
+                <select id="finQuarter" class="select" onchange="renderFinance()"></select>
+                <span id="finSource" class="fin-source"></span>
+            </div>
+        </div>
+        <section id="finGroups" class="fin-groups" aria-label="재무비율"></section>
+
+        <section class="chart-grid-2">
+            <div class="glass-panel chart-card chart--violet">
+                <div class="chart-card__header">
+                    <div>
+                        <div class="chart-card__title-row"><span class="chart-card__dot"></span><h3 class="chart-card__title">비율 추이</h3></div>
+                        <p class="chart-card__desc" id="finTrendDesc">분기별 변화</p>
+                    </div>
+                    <select id="finRatioSelect" class="select fin-ratio-select" onchange="renderFinanceCharts()" aria-label="추이를 볼 비율"></select>
+                </div>
+                <div class="chart-card__body"><canvas id="chartRatio" role="img" aria-label="선택한 재무비율의 분기별 추이"></canvas></div>
+            </div>
+            <div class="glass-panel chart-card chart--emerald">
+                <div class="chart-card__header">
+                    <div>
+                        <div class="chart-card__title-row"><span class="chart-card__dot"></span><h3 class="chart-card__title">자산 · 부채 · 자본</h3></div>
+                        <p class="chart-card__desc">단위: 억원 · 자산 = 부채 + 자본</p>
+                    </div>
+                    <span class="chart-card__tag">재무상태</span>
+                </div>
+                <div class="chart-card__body"><canvas id="chartBalance" role="img" aria-label="분기별 자산총계, 부채총계, 자본총계"></canvas></div>
+            </div>
+        </section>
+
+        <section class="glass-panel table-section">
+            <div class="table-toolbar">
+                <div>
+                    <h3 class="table-section__title"><i class="fa-solid fa-calculator"></i> 재무비율 계산기</h3>
+                    <p class="table-section__desc">기준 분기 재무제표가 채워져 있어요. 숫자(억원)를 바꾸면 비율이 바로 다시 계산돼요 — 다음 분기 목표를 넣어 보세요</p>
+                </div>
+                <div class="table-toolbar__actions">
+                    <button onclick="fillCalculator()" class="btn btn-secondary"><i class="fa-solid fa-rotate-left"></i><span>기준 분기 값으로</span></button>
+                </div>
+            </div>
+            <div class="calc-layout">
+                <div id="calcInputs" class="calc-inputs"></div>
+                <div id="calcResults" class="calc-results" aria-live="polite"></div>
+            </div>
+        </section>
+
+        <section class="glass-panel table-section">
+            <div class="table-toolbar">
+                <div>
+                    <h3 class="table-section__title"><i class="fa-solid fa-table-list"></i> 재무비율 전체 표</h3>
+                    <p class="table-section__desc">모든 분기 · 산식과 좋은 방향 포함</p>
+                </div>
+                <div class="table-toolbar__actions">
+                    <button onclick="exportFinanceCSV()" class="btn btn-success"><i class="fa-solid fa-file-excel"></i><span>CSV 추출</span></button>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table class="data-table kpi-table fin-table">
+                    <thead id="finHead"></thead>
+                    <tbody id="finBody"></tbody>
+                </table>
+            </div>
+        </section>
+
         <!-- ---------- 경쟁사 비교 ---------- -->
         <div class="section-heading">
             <div>
-                <h2 class="section-heading__title"><i class="fa-solid fa-ranking-star"></i> 경쟁사 비교 (4분기)</h2>
-                <p class="section-heading__desc">출처: Results_reporting5.xls · 우리 회사(B사)만 색으로 강조</p>
+                <h2 class="section-heading__title"><i class="fa-solid fa-ranking-star"></i> <span id="compTitle">경쟁사 비교</span></h2>
+                <p class="section-heading__desc" id="compDesc">우리 회사(B사)만 색으로 강조</p>
             </div>
         </div>
 
@@ -249,7 +322,7 @@
             <div class="table-toolbar">
                 <div>
                     <h3 class="table-section__title"><i class="fa-solid fa-table"></i> 전체 KPI 표</h3>
-                    <p class="table-section__desc">KPI 요약 시트 원본 · 전분기 대비는 4분기 vs 3분기 (비율 지표는 %p 차이)</p>
+                    <p class="table-section__desc"><span id="kpiTableDesc">KPI 요약 시트 원본 · 비율 지표의 전분기 대비는 %p 차이</span></p>
                 </div>
                 <div class="table-toolbar__actions">
                     <div class="search-field">
@@ -279,78 +352,121 @@
     </div>
 
     <footer class="app-footer">
-        4차년도 성과 대시보드 — 출처: <a href="https://docs.google.com/spreadsheets/d/1DtfVsZTLLpK2Dgn8gaNH48d7823AYeO1/edit" target="_blank" rel="noopener" class="footer-link">경영성과_KPI_4차년도 (구글 드라이브)</a> · KPI 요약 · 경쟁사 비교 탭
+        경영성과 대시보드 — 출처: <a href="https://docs.google.com/spreadsheets/d/1DtfVsZTLLpK2Dgn8gaNH48d7823AYeO1/edit" target="_blank" rel="noopener" class="footer-link">경영성과_KPI_4차년도 (구글 드라이브)</a> · KPI 요약 · 경쟁사 비교 탭
     </footer>
 
     <script>
         /* =============================================================
            데이터 출처
            -------------------------------------------------------------
-           구글 드라이브의 경영성과 KPI 엑셀 파일을 탭별로(gid) CSV로 내려받는다.
+           구글 드라이브의 경영성과 KPI 엑셀 파일을 통째로(xlsx) 받아
+           탭 "이름"으로 찾아 읽는다 → 파일을 새 버전으로 바꿔 올려도 연결이 유지된다.
            파일이 "링크가 있는 모든 사용자 · 뷰어"로 공유되어 있어야 하며,
            시트를 고치면 다음 갱신 때 바로 반영된다.
-           ※ 공유를 끄거나 탭을 지웠다 다시 만들면(gid 변경) 사본 데이터로 바뀐다.
-           *_SNAPSHOT: 시트를 못 불러올 때 쓰는 엑셀 기준 사본
+           *_SNAPSHOT: 시트(또는 탭)를 못 불러올 때 쓰는 엑셀 기준 사본
            ============================================================= */
         const SHEET_ID = '1DtfVsZTLLpK2Dgn8gaNH48d7823AYeO1';
         const SHEET_EDIT_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
-        const GID = { kpi: '1491406889', comp: '795925127' };   // KPI 요약 · 경쟁사 비교(4Q)
-        const sheetUrl = gid => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}&t=${Date.now()}`;
+        const workbookUrl = () => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=xlsx&t=${Date.now()}`;
+        // 탭 이름 찾기 규칙 (앞부분만 맞으면 됨)
+        const TAB = { kpi: n => n.startsWith('KPI'), comp: n => n.startsWith('경쟁사'), fs: n => n.startsWith('재무제표') };
+        const TAB_NAME = { kpi: 'KPI 요약', comp: '경쟁사 비교', fs: '재무제표' };
         document.getElementById('sheetLink').href = SHEET_EDIT_URL;
-        const SNAPSHOT_DATE = '2026-10-24';
-        const KPI_SNAPSHOT = `4차년도 경영성과 KPI 요약,,,,,,,,,,
-"파란 글씨=원본 수치 직접입력 / 검정=수식 / 초록=원데이터 시트 링크 / 노란 칸=산식 가정 / ""–""=원본 데이터 없음 / 등급은 낮을수록 우수",,,,,,,,,,
-,,,,,,,,,,
-구분,KPI,단위,3차년도 4분기,4차년도 1분기,4차년도 2분기,4차년도 3분기,4차년도 4분기,전분기 대비(4Q vs 3Q),산식,비고
-기존 지표,,,,,,,,,,
-,매출액,원,"88,631,620,000","78,568,435,236","132,599,384,648","166,944,124,122","221,620,823,645",+32.8%,원데이터,
-,영업이익,원,"5,069,504,571","1,069,368,868","25,280,146,497","20,611,212,916","17,380,678,255",-15.7%,원데이터,
-,판매가능량,개,"151,537","144,149","182,692","361,794","549,864",+52.0%,원데이터,
-,판매량,개,"129,860","106,611","168,958","193,904","238,856",+23.2%,원데이터,
-,발주량,개,"150,000","150,000","155,000","370,000","80,002",-78.4%,원데이터,3개국 발주량 합
-,생산량,개,"136,080","122,472","145,152","348,062","381,974",+9.7%,원데이터,
-,인당 판매량,개,251,214,351,319,339,+6.3%,한·미·중 인당판매량 단순평균,3Y4·1Q는 기존 시트1 값
-,기말재고,개,"21,677","37,539","13,732","167,890","311,008",+85.2%,원데이터,
-,판매가(평균),원,"682,517","736,964","784,807","860,963","927,843",+7.8%,매출액 ÷ 판매량,
-,단위당 제조원가,원,"361,523","414,843","349,205","327,585","388,213",+18.5%,당기제품 제조원가 ÷ 생산량 (3개국 가중평균),2Q 이전은 한국 단독 생산 값
-,마케팅 원가(단위당),원,"282,208","130,569","126,608","195,428","301,933",+54.5%,(광고비+판촉비) ÷ 판매량 ※가정,기존 산식 미확인. 3Y4 값은 단위당 판관비와 동일(복붙 의심)
-,단위당 판관비,원,"282,208","312,350","250,060","425,634","504,439",+18.5%,판관비 ÷ 판매량,"1Q는 판관비 33,299,944,274 기준 재계산값 312,350 (기존 시트1 값 312,320과 30원 차이)"
-수익성,,,,,,,,,,
-,매출총이익률,%,–,–,50.9%,61.8%,62.2%,+0.4%p,매출총이익 ÷ 매출액,
-,영업이익률,%,5.7%,1.4%,19.1%,12.3%,7.8%,-4.5%p,영업이익 ÷ 매출액,3분기 연속 하락
-,순이익률,%,–,–,16.0%,9.9%,6.4%,-3.5%p,당기순이익 ÷ 매출액,
-,판관비율,%,–,42.4%,31.9%,49.4%,54.4%,+4.9%p,판관비 ÷ 매출액,이익률 하락의 주원인
-현금·재고·재무,,,,,,,,,,
-,영업활동 현금흐름,원,–,"(3,300,000,000)",–,"(45,213,824,464)","(70,303,001,975)",-55.5%,원데이터,2분기 연속 적자
-,긴급자금대출,원,–,–,–,"39,829,947,341","40,837,479,129",+2.5%,원데이터,기말 현금 0원
-,판매율(소진율),%,85.7%,74.0%,92.5%,53.6%,43.4%,-10.2%p,판매량 ÷ 판매가능량,
-,재고 보유기간,분기,0.17분기,0.35분기,0.08분기,0.87분기,1.30분기,+50.4%,기말재고 ÷ 판매량,1.0 = 한 분기 판매분
-,재고자산(금액),원,–,–,"5,723,348,660","55,942,385,850","120,477,999,891",+115.4%,원데이터,
-,매출채권,원,–,–,–,"66,777,649,649","88,648,329,458",+32.8%,원데이터,
-,부채비율,%,–,–,–,35.1%,87.3%,+52.2%p,부채총계 ÷ 자본총계,
-효율,,,,,,,,,,
-,마케팅 효율,배,–,–,–,4.41x,3.07x,-30.2%,매출액 ÷ (광고비+판촉비),광고·판촉 1원당 매출
-,매출 계획 달성률,%,–,70.1%,104.5%,51.5%,131.1%,+79.6%p,매출 실적 ÷ 매출 계획,"4Q는 계획을 3,241억→1,690억으로 하향한 결과"
-경쟁력(BSC),,,,,,,,,,
-,시장점유율,%,–,24.1%,27.6%,30.5%,30.0%,-0.5%p,원데이터,
-,브랜드등급,등급,–,–,3.0,2.0,2.0,0,원데이터,낮을수록 우수
-,품질등급,등급,–,–,4.0,3.0,2.0,-1.0,원데이터,낮을수록 우수
-,제품모델 번호,번호,–,–,4.0,4.0,5.0,+1.0,원데이터,높을수록 신모델
-,영업직원 생산성등급,등급,–,–,5.667,5.667,6.333,+0.666,원데이터,낮을수록 우수
-,신용등급,등급,–,–,1.0,6.0,6.0,0,원데이터,낮을수록 우수
-,주가,원,–,–,"7,659","4,495","4,839",+7.7%,원데이터,
-,연구개발비,원,–,–,–,"2,400,000,000","4,800,000,000",+100.0%,원데이터,`;
+        const SNAPSHOT_DATE = '2026-11-24';
+        const KPI_SNAPSHOT = `경영성과 KPI 요약 (3차년도 4분기 ~ 5차년도 1분기),,,,,,,,,,,
+"파란 글씨=원본 수치 직접입력 / 검정=수식 / 초록=원데이터 시트 링크 / 노란 칸=산식 가정 / ""–""=원본 데이터 없음 / 등급은 낮을수록 우수",,,,,,,,,,,
+,,,,,,,,,,,
+구분,KPI,단위,3차년도 4분기,4차년도 1분기,4차년도 2분기,4차년도 3분기,4차년도 4분기,5차년도 1분기,전분기 대비(5Y1Q vs 4Q),산식,비고
+기존 지표,,,,,,,,,,,
+,매출액,원,"88,631,620,000","78,568,435,236","132,599,384,648","166,944,124,122","221,620,823,645","240,409,158,684",+8.5%,원데이터,"5Y1Q 매출에 청산 매출 870.8억(구모델 재고 311,008개 × 개당 28만 원) 포함"
+,영업이익,원,"5,069,504,571","1,069,368,868","25,280,146,497","20,611,212,916","17,380,678,255","(14,769,878,721)",부호전환,원데이터,
+,판매가능량,개,"151,537","144,149","182,692","361,794","549,864","319,550",-41.9%,원데이터,
+,판매량,개,"129,860","106,611","168,958","193,904","238,856","157,755",-34.0%,원데이터,
+,발주량,개,"150,000","150,000","155,000","370,000","80,002","250,000",+212.5%,원데이터,3개국 발주량 합
+,생산량,개,"136,080","122,472","145,152","348,062","381,974","319,550",-16.3%,원데이터,
+,인당 판매량,개,251,214,351,319,339,256,-24.5%,한·미·중 인당판매량 단순평균,3Y4·1Q는 기존 시트1 값
+,기말재고,개,"21,677","37,539","13,732","167,890","311,008","161,796",-48.0%,원데이터,
+,판매가(평균),원,"682,517","736,964","784,807","860,963","927,843","971,931",+4.8%,매출액 ÷ 판매량,5Y1Q는 청산 매출 870.8억 제외 (정상 판매분 기준)
+,단위당 제조원가,원,"361,523","414,843","349,205","327,585","388,213","384,966",-0.8%,당기제품 제조원가 ÷ 생산량 (3개국 가중평균),2Q 이전은 한국 단독 생산 값
+,마케팅 원가(단위당),원,"282,208","130,569","126,608","195,428","301,933","179,855",-40.4%,(광고비+판촉비) ÷ 판매량 ※가정,기존 산식 미확인. 3Y4 값은 단위당 판관비와 동일(복붙 의심)
+,단위당 판관비,원,"282,208","312,350","250,060","425,634","504,439","466,421",-7.5%,판관비 ÷ 판매량,"1Q는 판관비 33,299,944,274 기준 재계산값 312,350 (기존 시트1 값 312,320과 30원 차이)"
+수익성,,,,,,,,,,,
+,매출총이익률,%,–,–,50.9%,61.8%,62.2%,24.5%,-37.7%p,매출총이익 ÷ 매출액,
+,영업이익률,%,5.7%,1.4%,19.1%,12.3%,7.8%,(6.1%),-14.0%p,영업이익 ÷ 매출액,"2분기 19.1%가 정점, 5Y1Q 적자 전환(청산 손실 약 334억)"
+,순이익률,%,–,–,16.0%,9.9%,6.4%,(7.4%),-13.7%p,당기순이익 ÷ 매출액,5Y1Q 적자 전환
+,판관비율,%,–,42.4%,31.9%,49.4%,54.4%,30.6%,-23.8%p,판관비 ÷ 매출액,이익률 하락의 주원인
+현금·재고·재무,,,,,,,,,,,
+,영업활동 현금흐름,원,–,"(3,300,000,000)",–,"(45,213,824,464)","(70,303,001,975)","35,278,348,413",부호전환,원데이터,5Y1Q 흑자 전환 (+352.8억)
+,긴급자금대출,원,–,–,–,"39,829,947,341","40,837,479,129","5,559,130,716",-86.4%,원데이터,5Y1Q: 408억 상환 후 55.6억 재차입 · 기말 현금 0원
+,판매율(소진율),%,85.7%,74.0%,92.5%,53.6%,43.4%,49.4%,+5.9%p,판매량 ÷ 판매가능량,5Y1Q 판매가능량은 구모델 재고 청산 후 기준
+,재고 보유기간,분기,0.17분기,0.35분기,0.08분기,0.87분기,1.30분기,1.03분기,-21.2%,기말재고 ÷ 판매량,1.0 = 한 분기 판매분
+,재고자산(금액),원,–,–,"5,723,348,660","55,942,385,850","120,477,999,891","61,895,165,606",-48.6%,원데이터,
+,매출채권,원,–,–,–,"66,777,649,649","88,648,329,458","96,163,663,474",+8.5%,원데이터,
+,부채비율,%,–,–,–,35.1%,87.3%,69.2%,-18.1%p,부채총계 ÷ 자본총계,
+효율,,,,,,,,,,,
+,마케팅 효율,배,–,–,–,4.41x,3.07x,5.40x,+75.9%,매출액 ÷ (광고비+판촉비),광고·판촉 1원당 매출 · 5Y1Q는 청산 매출 제외
+,매출 계획 달성률,%,–,70.1%,104.5%,51.5%,131.1%,92.6%,-38.6%p,매출 실적 ÷ 매출 계획,"4Q는 계획 하향 결과 · 5Y1Q 계획 2,597억 대비"
+경쟁력(BSC),,,,,,,,,,,
+,시장점유율,%,–,24.1%,27.6%,30.5%,30.0%,24.8%,-5.3%p,원데이터,
+,브랜드등급,등급,–,–,3.0,2.0,2.0,2.0,0,원데이터,낮을수록 우수
+,품질등급,등급,–,–,4.0,3.0,2.0,1.0,-1.0,원데이터,낮을수록 우수
+,제품모델 번호,번호,–,–,4.0,4.0,5.0,5.0,0,원데이터,높을수록 신모델
+,영업직원 생산성등급,등급,–,–,5.667,5.667,6.333,7.0,+0.667,원데이터,낮을수록 우수
+,신용등급,등급,–,–,1.0,6.0,6.0,7.0,+1.0,원데이터,"5Y1Q 7등급 (4개사 중 B사만 7, 나머지 1등급)"
+,주가,원,–,–,"7,659","4,495","4,839","3,754",-22.4%,원데이터,
+,연구개발비,원,–,–,–,"2,400,000,000","4,800,000,000","9,600,000,000",+100.0%,원데이터,`;
 
-        const COMP_SNAPSHOT = `4차년도 4분기 경쟁사 비교 (출처: Results_reporting5.xls B1·B2),,,,,,,,,,,,,,,,,,
+        const COMP_SNAPSHOT = `5차년도 1분기 경쟁사 비교 (출처: biz-manager B. 산업 동향 보고서 B1·B2),,,,,,,,,,,,,,,,,,
 ,,,,,,,,,,,,,,,,,,
 회사,매출액(원),판매량(개),시장점유율,순이익(원),순이익률,기말재고(개),재고/판매량,신용등급,주가(원),브랜드등급,제품모델,품질등급,설비효율등급,영업직원만족도,생산직원만족도,연구개발비(추정),점유율 순위,주가 순위
-A사,"279,703,129,240","266,755",33.5%,"55,262,607,106",19.8%,"26,783",0.10분기,1.0,"8,305",1.0,7.0,1.0,1.0,1.0,1.0,"8,669,537,204",1,1
-B사(우리),"221,620,823,645","238,856",30.0%,"14,090,596,276",6.4%,"311,008",1.30분기,6.0,"4,839",2.0,5.0,2.0,4.0,4.0,2.0,"5,252,071,866",2,4
-C사,"147,450,824,000","149,537",18.8%,"17,576,510,921",11.9%,"43,731",0.29분기,6.0,"4,995",4.0,6.0,3.0,2.0,6.0,4.0,"7,601,597,358",3,2
-D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,6.0,"4,994",4.0,6.0,5.0,6.0,3.0,4.0,"3,742,086,491",4,3
-평균,"198,324,963,121","198,984",25.0%,"24,761,071,920",11.6%,"96,217",0.43분기,4.75,"5,783",2.75,6.0,2.75,3.25,3.5,2.75,"6,316,323,230",,
+A사,"228,827,293,520","216,665",34.0%,"58,507,888,234",25.6%,"45,205",0.21분기,1.0,"8,314",1.0,7.0,1.0,1.0,1.0,1.0,"8,504,295,619",1,1
+B사(우리),"240,409,158,684","157,755",24.8%,"(17,745,447,456)",(7.4%),"161,796",1.03분기,7.0,"3,754",2.0,5.0,1.0,4.5,5.0,2.5,"10,379,073,046",2,4
+C사,"126,250,062,360","120,378",18.9%,"15,004,220,562",11.9%,"56,351",0.47분기,1.0,"7,398",4.0,6.0,2.0,2.5,7.0,3.5,"4,694,473,543",4,2
+D사,"141,123,558,200","142,673",22.4%,"25,781,630,919",18.3%,"11,306",0.08분기,1.0,"7,338",4.0,6.0,4.0,7.0,2.67,3.0,"3,708,693,944",3,3
+평균,"184,152,518,191","159,368",25.0%,"20,387,073,065",12.1%,"68,665",0.45분기,2.5,"6,701",2.75,6.0,2.0,3.75,3.92,2.5,"6,821,634,038",,
 ,,,,,,,,,,,,,,,,,,
-"등급 항목은 낮을수록 우수. 재고/판매량 = 기말재고 ÷ 분기 판매량 (1.0 = 한 분기 판매분). 연구개발비는 리포트상 ""추정액""으로 우리 손익계산서 실제치(48억)와 다름.",,,,,,,,,,,,,,,,,,`;
+"등급 항목은 낮을수록 우수. 재고/판매량 = 기말재고 ÷ 분기 판매량. 연구개발비는 리포트상 ""추정액""(B사 실제 96억). B사 매출에는 청산 매출 870.8억 포함. A사는 신공정 특허 인수(제조원가 10% 절감).",,,,,,,,,,,,,,,,,,`;
+
+        // 재무제표 탭 사본 — 드라이브 파일에 재무제표 탭이 아직 없을 때 사용
+        const FS_SNAPSHOT_DATE = '2026-11-24';
+        const FS_SNAPSHOT = `분기별 재무제표 (단위: 원),,,,,,,,,,,
+파란 글씨 = 결과 보고서(A5-2 손익계산서 · A5-3 현금흐름표 · A5-4 재무상태표) 값 직접 입력. 새 분기는 빈 열에 숫자만 넣으면 재무비율 탭과 대시보드에 자동 반영됨,,,,,,,,,,,
+,,,,,,,,,,,
+구분,항목,단위,4차년도 1분기,4차년도 2분기,4차년도 3분기,4차년도 4분기,5차년도 1분기,5차년도 2분기,5차년도 3분기,5차년도 4분기,출처
+손익,,,,,,,,,,,
+,매출액,원,"78,568,435,236","132,599,384,648","166,944,124,122","221,620,823,645","240,409,158,684",,,,A5-2 손익계산서
+,청산 매출액,원,0,0,0,0,"87,082,240,000",,,,A5-2 손익계산서
+,매출원가,원,"44,199,122,094","65,069,665,517","63,800,718,306","83,751,820,805","181,598,785,985",,,,A5-2 손익계산서
+,당분기 제조원가,원,"54,689,438,600","52,465,963,600","114,019,755,496","148,287,434,846","123,015,951,700",,,,A5-2 손익계산서
+,매출총이익,원,"34,369,313,142","67,529,719,131","103,143,405,816","137,869,002,840","58,810,372,699",,,,A5-2 손익계산서
+,판매및관리비,원,"33,299,944,274","42,249,572,634","82,532,192,900","120,488,324,585","73,580,251,420",,,,A5-2 손익계산서
+,광고비,원,"6,572,300,000","9,068,400,000","16,021,600,000","32,208,000,000","8,478,000,000",,,,A5-2 손익계산서
+,판매촉진비,원,"3,131,890,000","6,651,160,000","21,872,640,000","39,910,400,000","19,895,040,000",,,,A5-2 손익계산서
+,재고관리비,원,"1,437,650,480","525,094,720","6,650,376,800","11,743,470,600","6,114,964,160",,,,A5-2 손익계산서
+,연구개발비,원,"600,000,000","1,200,000,000","2,400,000,000","4,800,000,000","9,600,000,000",,,,A5-2 손익계산서
+,영업이익,원,"1,069,368,868","25,280,146,497","20,611,212,916","17,380,678,255","-14,769,878,721",,,,A5-2 손익계산서
+,이자비용,원,0,0,0,"3,369,281,979","3,131,168,735",,,,A5-2 손익계산서
+,당기순이익,원,"1,039,868,868","21,269,646,497","16,519,212,916","14,090,596,276","-17,745,447,456",,,,A5-2 손익계산서
+현금흐름,,,,,,,,,,,
+,영업활동 현금흐름,원,"-3,303,778,132","14,403,364,249","-45,213,824,464","-70,303,001,975","35,278,348,413",,,,A5-3 현금흐름표
+,투자활동 현금흐름,원,"-6,643,665,000","-11,643,665,000","-2,880,000,000",0,0,,,,A5-3 현금흐름표
+,재무활동 현금흐름,원,"-31,196,066","1,283,053,535","-825,960,646","29,465,522,846","-40,837,479,129",,,,A5-3 현금흐름표
+,현금의 증감,원,"-9,978,639,198","4,042,752,784","-48,919,785,109","-40,837,479,129","-5,559,130,716",,,,A5-3 현금흐름표
+,긴급자금대출,원,0,0,"39,829,947,341","40,837,479,129","5,559,130,716",,,,A5-3 현금흐름표
+,기말 현금,원,"5,047,084,985","9,089,837,769",0,0,0,,,,A5-3 현금흐름표
+재무상태,,,,,,,,,,,
+,유동자산,원,"55,792,009,656","68,812,940,288","126,448,035,499","212,953,529,349","162,041,629,080",,,,A5-4 재무상태표
+,당좌자산,원,"37,464,959,079","63,089,591,628","70,505,649,649","92,475,529,458","100,146,463,474",,,,A5-4 재무상태표
+,현금 및 현금등가물,원,"5,047,084,985","9,089,837,769",0,0,0,,,,A5-4 재무상태표
+,매출채권,원,"31,427,374,094","53,039,753,859","66,777,649,649","88,648,329,458","96,163,663,474",,,,A5-4 재무상태표
+,단기매매증권,원,"990,500,000","960,000,000","3,728,000,000","3,827,200,000","3,982,800,000",,,,A5-4 재무상태표
+,재고자산,원,"18,327,050,577","5,723,348,660","55,942,385,850","120,477,999,891","61,895,165,606",,,,A5-4 재무상태표
+,비유동자산,원,"31,175,434,400","29,063,538,800","26,951,643,200","24,839,747,600","22,727,852,000",,,,A5-4 재무상태표
+,자산총계,원,"86,967,444,056","97,876,479,088","153,399,678,699","237,793,276,949","184,769,481,080",,,,A5-4 재무상태표
+,유동부채,원,0,0,"39,829,947,341","40,837,479,129","5,559,130,716",,,,A5-4 재무상태표
+,비유동부채,원,0,0,0,"70,000,000,000","70,000,000,000",,,,A5-4 재무상태표
+,부채총계,원,0,0,"39,829,947,341","110,837,479,129","75,559,130,716",,,,A5-4 재무상태표
+,자본총계,원,"86,967,444,056","97,876,479,088","113,569,731,358","126,955,797,820","109,210,350,364",,,,A5-4 재무상태표`;
 
         const SELF = 'B사';
         let COMPETITORS = [];   // 경쟁사 비교 탭에서 채움
@@ -379,7 +495,8 @@ D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,
         const K = name => kpis.find(k => k.name === name) || { values: [], unit: '', change: '', note: '' };
         const last = arr => arr[arr.length - 1];
         const prev = arr => arr[arr.length - 2];
-        const shortQ = q => q.replace('3차년도 ', "3Y ").replace('4차년도 ', '').replace('분기', 'Q');
+        // '4차년도 2분기' → '2Q', 다른 연차는 '5Y 1Q'처럼 연차 표시
+        const shortQ = q => q.replace(/^(\d+)차년도 /, (m, y) => y === '4' ? '' : `${y}Y `).replace('분기', 'Q');
 
         // "88,631,620,000" · "(3,300,000,000)" · "5.7%" · "4.41x" · "0.17분기" · "–" → 숫자 | null
         function parseNum(raw) {
@@ -517,13 +634,29 @@ D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,
            데이터 불러오기 — 탭별로 시트 → 실패 시 마지막 값 → 사본
            자동 동기화: 정해진 주기마다 확인, 값이 바뀌었을 때만 다시 그림
            ============================================================= */
-        const lastText = { kpi: null, comp: null };
+        const lastText = { kpi: null, comp: null, fs: null };
         let lastCheck = 0, lastChange = null, syncTimer = null, loading = false;
+        let fsFromSnapshot = false, staleTabs = [], COMP_TITLE = '';
+        // 탭 내용이 어느 시점까지인지: KPI·재무제표 = 분기 열 수, 경쟁사 = 제목의 분기
+        function periodOf(key, text) {
+            try {
+                if (key === 'comp') { const m = text.split('\n')[0].match(/(\d+)차년도 (\d)분기/); return m ? m[1] * 4 + Number(m[2]) : 0; }
+                return (key === 'kpi' ? parseKpiCsv(text) : parseFsCsv(text)).quarters.length;
+            } catch (e) { return 0; }
+        }
 
-        async function fetchTab(gid) {
-            const res = await fetch(sheetUrl(gid), { cache: 'no-store' });
+        // 엑셀 파일 1개를 받아 탭 이름으로 CSV 텍스트를 꺼냄 (없는 탭은 undefined)
+        async function fetchWorkbook() {
+            if (!window.XLSX) throw new Error('엑셀 읽기 도구(SheetJS)를 불러오지 못함');
+            const res = await fetch(workbookUrl(), { cache: 'no-store' });
             if (!res.ok) throw new Error('HTTP ' + res.status);
-            return res.text();
+            const wb = XLSX.read(new Uint8Array(await res.arrayBuffer()), { type: 'array' });
+            const out = {};
+            for (const [key, match] of Object.entries(TAB)) {
+                const name = wb.SheetNames.find(match);
+                if (name) out[key] = XLSX.utils.sheet_to_csv(wb.Sheets[name], { blankrows: true });
+            }
+            return out;
         }
 
         async function loadData(silent = false) {
@@ -533,32 +666,45 @@ D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,
             if (!silent) spinner.classList.add('fa-spin');
 
             try {
-                const [kpiRes, compRes] = await Promise.allSettled([fetchTab(GID.kpi), fetchTab(GID.comp)]);
+                let book = null;
+                try { book = await fetchWorkbook(); } catch (e) { console.warn('시트 불러오기 실패:', e); }
                 const tabs = {}, failed = [];
+                staleTabs = [];
                 let usedSnapshot = false;
-                for (const [key, res, snapshot, parse] of [
-                    ['kpi',  kpiRes,  KPI_SNAPSHOT,  parseKpiCsv],
-                    ['comp', compRes, COMP_SNAPSHOT, parseCompCsv]
+                for (const [key, snapshot, parse] of [
+                    ['kpi',  KPI_SNAPSHOT,  parseKpiCsv],
+                    ['comp', COMP_SNAPSHOT, parseCompCsv],
+                    ['fs',   FS_SNAPSHOT,   parseFsCsv]
                 ]) {
-                    let text = res.status === 'fulfilled' ? res.value : null;
+                    let text = book ? book[key] ?? null : null;
                     try { if (text !== null) parse(text); } catch (e) { console.warn(key, e); text = null; }
                     if (text === null) {
-                        failed.push(key);
-                        if (lastText[key] === null) usedSnapshot = true;
-                        text = lastText[key] ?? snapshot;
+                        // 재무제표 탭이 파일에 아직 없는 경우는 오류로 보지 않고 사본을 씀
+                        if (key === 'fs' && book && book.fs === undefined) { text = FS_SNAPSHOT; }
+                        else {
+                            failed.push(key);
+                            if (lastText[key] === null) usedSnapshot = true;
+                            text = lastText[key] ?? snapshot;
+                        }
                     }
+                    // 드라이브 파일이 아직 이전 버전이면 더 최신인 사본을 씀
+                    if (text !== snapshot && periodOf(key, snapshot) > periodOf(key, text)) { text = snapshot; staleTabs.push(key); }
                     tabs[key] = text;
                 }
+                fsFromSnapshot = tabs.fs === FS_SNAPSHOT;
 
-                if (tabs.kpi !== lastText.kpi || tabs.comp !== lastText.comp) {
+                if (tabs.kpi !== lastText.kpi || tabs.comp !== lastText.comp || tabs.fs !== lastText.fs) {
                     const p = parseKpiCsv(tabs.kpi);
                     quarters = p.quarters;
                     kpis = p.kpis;
                     COMPETITORS = parseCompCsv(tabs.comp);
+                    COMP_TITLE = tabs.comp.split('\n')[0].replace(/^"|"$/g, '').split(',')[0];
+                    FIN = parseFsCsv(tabs.fs);
                     // 첫 로딩이 아니고, 시트에서 새로 받은 값일 때만 "변경" 알림
-                    if (lastText.kpi !== null && failed.length < 2) { lastChange = new Date(); flashUpdated(); }
+                    if (lastText.kpi !== null && book) { lastChange = new Date(); flashUpdated(); }
                     lastText.kpi = tabs.kpi;
                     lastText.comp = tabs.comp;
+                    lastText.fs = tabs.fs;
                     renderAll();
                 }
                 lastCheck = Date.now();
@@ -576,8 +722,8 @@ D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,
         }
         let lastSuccess = null;
         function updateSourceText(failed, usedSnapshot) {
-            const tabName = k => k === 'kpi' ? 'KPI 요약' : '경쟁사 비교';
-            if (failed.length === 2) {
+            const tabName = k => TAB_NAME[k];
+            if (failed.length === 3) {
                 if (usedSnapshot) {
                     setSource(false, `엑셀 사본 데이터 (${SNAPSHOT_DATE} 기준) · 시트 연결 실패 · ${autoLabel()}`);
                     showError('구글 시트를 불러오지 못해 엑셀 기준 사본으로 표시합니다. 연결되면 자동으로 다시 불러옵니다.');
@@ -589,7 +735,7 @@ D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,
             }
             lastSuccess = new Date();
             const changeTxt = lastChange ? ` · ${hhmm(lastChange)} 변경 반영` : '';
-            setSource(true, `구글 시트 연동 · ${hhmm(lastSuccess)} 확인${changeTxt} · ${autoLabel()}`);
+            setSource(true, `구글 시트 연동 · ${hhmm(lastSuccess)} 확인${changeTxt}${staleTabs.length ? ' · 일부 탭은 최신 사본' : ''} · ${autoLabel()}`);
             if (failed.length) {
                 showError(`${tabName(failed[0])} 탭을 불러오지 못해 ${usedSnapshot ? '엑셀 기준 사본' : '이전 값'}으로 표시합니다.`);
             } else dismissAlert();
@@ -635,7 +781,255 @@ D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,
             document.getElementById('sourceText').textContent = text;
         }
 
+        /* =============================================================
+           재무비율 — 재무제표 탭 → 48개 비율
+           RATIO_SPEC 은 엑셀 "재무비율" 탭 수식과 같은 목록에서 생성됨
+           ============================================================= */
+        const RATIO_SPEC = [{"group": "수익성", "name": "매출총이익률", "unit": "%", "type": "ratio", "num": [[1, "매출총이익"]], "den": [[1, "매출액"]], "formula": "매출총이익 ÷ 매출액", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "수익성", "name": "영업이익률", "unit": "%", "type": "ratio", "num": [[1, "영업이익"]], "den": [[1, "매출액"]], "formula": "영업이익 ÷ 매출액", "better": "up", "flag": [10, 0], "pos": false, "note": "", "zero": null}, {"group": "수익성", "name": "순이익률", "unit": "%", "type": "ratio", "num": [[1, "당기순이익"]], "den": [[1, "매출액"]], "formula": "당기순이익 ÷ 매출액", "better": "up", "flag": [5, 0], "pos": false, "note": "", "zero": null}, {"group": "수익성", "name": "매출원가율", "unit": "%", "type": "ratio", "num": [[1, "매출원가"]], "den": [[1, "매출액"]], "formula": "매출원가 ÷ 매출액", "better": "down", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "수익성", "name": "판관비율", "unit": "%", "type": "ratio", "num": [[1, "판매및관리비"]], "den": [[1, "매출액"]], "formula": "판매및관리비 ÷ 매출액", "better": "down", "flag": [40, 50], "pos": false, "note": "", "zero": null}, {"group": "수익성", "name": "광고선전비율", "unit": "%", "type": "ratio", "num": [[1, "광고비"]], "den": [[1, "매출액"]], "formula": "광고비 ÷ 매출액", "better": "down", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "수익성", "name": "판매촉진비율", "unit": "%", "type": "ratio", "num": [[1, "판매촉진비"]], "den": [[1, "매출액"]], "formula": "판매촉진비 ÷ 매출액", "better": "down", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "수익성", "name": "마케팅비율", "unit": "%", "type": "ratio", "num": [[1, "광고비"], [1, "판매촉진비"]], "den": [[1, "매출액"]], "formula": "(광고비 + 판매촉진비) ÷ 매출액", "better": "down", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "수익성", "name": "연구개발비율", "unit": "%", "type": "ratio", "num": [[1, "연구개발비"]], "den": [[1, "매출액"]], "formula": "연구개발비 ÷ 매출액", "better": "none", "flag": null, "pos": false, "note": "미래 제품 경쟁력을 위한 투자", "zero": null}, {"group": "수익성", "name": "재고관리비율", "unit": "%", "type": "ratio", "num": [[1, "재고관리비"]], "den": [[1, "매출액"]], "formula": "재고관리비 ÷ 매출액", "better": "down", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "수익성", "name": "ROE (자기자본이익률)", "unit": "%", "type": "ratio", "num": [[1, "당기순이익"]], "den": [[1, "자본총계"]], "formula": "당기순이익 ÷ 자본총계", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "수익성", "name": "ROA (총자산이익률)", "unit": "%", "type": "ratio", "num": [[1, "당기순이익"]], "den": [[1, "자산총계"]], "formula": "당기순이익 ÷ 자산총계", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "수익성", "name": "총자산영업이익률", "unit": "%", "type": "ratio", "num": [[1, "영업이익"]], "den": [[1, "자산총계"]], "formula": "영업이익 ÷ 자산총계", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "안정성", "name": "부채비율", "unit": "%", "type": "ratio", "num": [[1, "부채총계"]], "den": [[1, "자본총계"]], "formula": "부채총계 ÷ 자본총계", "better": "down", "flag": [100, 200], "pos": false, "note": "", "zero": null}, {"group": "안정성", "name": "자기자본비율", "unit": "%", "type": "ratio", "num": [[1, "자본총계"]], "den": [[1, "자산총계"]], "formula": "자본총계 ÷ 자산총계", "better": "up", "flag": [50, 30], "pos": false, "note": "", "zero": null}, {"group": "안정성", "name": "차입금의존도", "unit": "%", "type": "ratio", "num": [[1, "부채총계"]], "den": [[1, "자산총계"]], "formula": "부채총계 ÷ 자산총계", "better": "down", "flag": [30, 50], "pos": false, "note": "이 회사 부채는 모두 차입금(단기차입금·사채)", "zero": null}, {"group": "안정성", "name": "유동부채비율", "unit": "%", "type": "ratio", "num": [[1, "유동부채"]], "den": [[1, "자본총계"]], "formula": "유동부채 ÷ 자본총계", "better": "down", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "안정성", "name": "비유동부채비율", "unit": "%", "type": "ratio", "num": [[1, "비유동부채"]], "den": [[1, "자본총계"]], "formula": "비유동부채 ÷ 자본총계", "better": "down", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "안정성", "name": "비유동비율", "unit": "%", "type": "ratio", "num": [[1, "비유동자산"]], "den": [[1, "자본총계"]], "formula": "비유동자산 ÷ 자본총계", "better": "down", "flag": [100, 150], "pos": false, "note": "", "zero": null}, {"group": "안정성", "name": "비유동장기적합률", "unit": "%", "type": "ratio", "num": [[1, "비유동자산"]], "den": [[1, "자본총계"], [1, "비유동부채"]], "formula": "비유동자산 ÷ (자본총계 + 비유동부채)", "better": "down", "flag": [100, 120], "pos": false, "note": "", "zero": null}, {"group": "안정성", "name": "순차입금비율", "unit": "%", "type": "ratio", "num": [[1, "부채총계"], [-1, "현금 및 현금등가물"]], "den": [[1, "자본총계"]], "formula": "(부채총계 − 현금) ÷ 자본총계", "better": "down", "flag": [50, 100], "pos": false, "note": "", "zero": null}, {"group": "안정성", "name": "이자보상배율", "unit": "배", "type": "ratio", "num": [[1, "영업이익"]], "den": [[1, "이자비용"]], "formula": "영업이익 ÷ 이자비용", "better": "up", "flag": [3, 1], "pos": false, "note": "이자비용이 0이면 \"이자 없음\"", "zero": "이자 없음"}, {"group": "유동성", "name": "유동비율", "unit": "%", "type": "ratio", "num": [[1, "유동자산"]], "den": [[1, "유동부채"]], "formula": "유동자산 ÷ 유동부채", "better": "up", "flag": [200, 100], "pos": false, "note": "", "zero": "유동부채 없음"}, {"group": "유동성", "name": "당좌비율", "unit": "%", "type": "ratio", "num": [[1, "당좌자산"]], "den": [[1, "유동부채"]], "formula": "당좌자산 ÷ 유동부채", "better": "up", "flag": [100, 50], "pos": false, "note": "", "zero": "유동부채 없음"}, {"group": "유동성", "name": "현금비율", "unit": "%", "type": "ratio", "num": [[1, "현금 및 현금등가물"], [1, "단기매매증권"]], "den": [[1, "유동부채"]], "formula": "(현금 + 단기매매증권) ÷ 유동부채", "better": "up", "flag": [20, 10], "pos": false, "note": "", "zero": "유동부채 없음"}, {"group": "유동성", "name": "순운전자본", "unit": "원", "type": "amount", "num": [[1, "유동자산"], [-1, "유동부채"]], "den": [], "formula": "유동자산 − 유동부채", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "유동성", "name": "순운전자본비율", "unit": "%", "type": "ratio", "num": [[1, "유동자산"], [-1, "유동부채"]], "den": [[1, "자산총계"]], "formula": "(유동자산 − 유동부채) ÷ 자산총계", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "활동성", "name": "총자산회전율", "unit": "회", "type": "ratio", "num": [[1, "매출액"]], "den": [[1, "자산총계"]], "formula": "매출액 ÷ 자산총계", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "활동성", "name": "자기자본회전율", "unit": "회", "type": "ratio", "num": [[1, "매출액"]], "den": [[1, "자본총계"]], "formula": "매출액 ÷ 자본총계", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "활동성", "name": "비유동자산회전율", "unit": "회", "type": "ratio", "num": [[1, "매출액"]], "den": [[1, "비유동자산"]], "formula": "매출액 ÷ 비유동자산", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "활동성", "name": "재고자산회전율", "unit": "회", "type": "ratio", "num": [[1, "매출원가"]], "den": [[1, "재고자산"]], "formula": "매출원가 ÷ 재고자산", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "활동성", "name": "재고자산회전기간", "unit": "일", "type": "days", "num": [[1, "재고자산"]], "den": [[1, "매출원가"]], "formula": "91.25일 × 재고자산 ÷ 매출원가", "better": "down", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "활동성", "name": "매출채권회전율", "unit": "회", "type": "ratio", "num": [[1, "매출액"]], "den": [[1, "매출채권"]], "formula": "매출액 ÷ 매출채권", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "활동성", "name": "매출채권회수기간", "unit": "일", "type": "days", "num": [[1, "매출채권"]], "den": [[1, "매출액"]], "formula": "91.25일 × 매출채권 ÷ 매출액", "better": "down", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "성장성", "name": "매출액증가율", "unit": "%", "type": "growth", "num": [[1, "매출액"]], "den": [], "formula": "당기 매출액 ÷ 전기 매출액 − 1", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "성장성", "name": "정상매출증가율", "unit": "%", "type": "growth", "num": [[1, "매출액"], [-1, "청산 매출액"]], "den": [], "formula": "청산 매출을 뺀 매출의 증가율", "better": "up", "flag": null, "pos": false, "note": "재고 청산 효과 제외", "zero": null}, {"group": "성장성", "name": "매출총이익증가율", "unit": "%", "type": "growth", "num": [[1, "매출총이익"]], "den": [], "formula": "당기 ÷ 전기 − 1", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "성장성", "name": "영업이익증가율", "unit": "%", "type": "growth", "num": [[1, "영업이익"]], "den": [], "formula": "당기 ÷ 전기 − 1", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "성장성", "name": "순이익증가율", "unit": "%", "type": "growth", "num": [[1, "당기순이익"]], "den": [], "formula": "당기 ÷ 전기 − 1", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "성장성", "name": "총자산증가율", "unit": "%", "type": "growth", "num": [[1, "자산총계"]], "den": [], "formula": "당기 ÷ 전기 − 1", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "성장성", "name": "자기자본증가율", "unit": "%", "type": "growth", "num": [[1, "자본총계"]], "den": [], "formula": "당기 ÷ 전기 − 1", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "성장성", "name": "재고자산증가율", "unit": "%", "type": "growth", "num": [[1, "재고자산"]], "den": [], "formula": "당기 ÷ 전기 − 1", "better": "down", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "성장성", "name": "부채증가율", "unit": "%", "type": "growth", "num": [[1, "부채총계"]], "den": [], "formula": "당기 ÷ 전기 − 1", "better": "down", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "현금흐름 · 기타", "name": "영업현금흐름 마진", "unit": "%", "type": "ratio", "num": [[1, "영업활동 현금흐름"]], "den": [[1, "매출액"]], "formula": "영업활동 현금흐름 ÷ 매출액", "better": "up", "flag": null, "pos": false, "note": "", "zero": null}, {"group": "현금흐름 · 기타", "name": "영업현금흐름 ÷ 순이익", "unit": "배", "type": "ratio", "num": [[1, "영업활동 현금흐름"]], "den": [[1, "당기순이익"]], "formula": "영업활동 현금흐름 ÷ 당기순이익", "better": "up", "flag": null, "pos": true, "note": "이익의 질 · 순이익이 0 이하면 –", "zero": null}, {"group": "현금흐름 · 기타", "name": "현금흐름 부채비율", "unit": "%", "type": "ratio", "num": [[1, "영업활동 현금흐름"]], "den": [[1, "부채총계"]], "formula": "영업활동 현금흐름 ÷ 부채총계", "better": "up", "flag": null, "pos": false, "note": "", "zero": "부채 없음"}, {"group": "현금흐름 · 기타", "name": "현금흐름 이자보상배율", "unit": "배", "type": "ratio", "num": [[1, "영업활동 현금흐름"], [1, "이자비용"]], "den": [[1, "이자비용"]], "formula": "(영업활동 현금흐름 + 이자비용) ÷ 이자비용", "better": "up", "flag": null, "pos": false, "note": "", "zero": "이자 없음"}, {"group": "현금흐름 · 기타", "name": "청산 매출 비중", "unit": "%", "type": "ratio", "num": [[1, "청산 매출액"]], "den": [[1, "매출액"]], "formula": "청산 매출액 ÷ 매출액", "better": "down", "flag": null, "pos": false, "note": "", "zero": null}];
+        const FIN_GROUPS = [...new Set(RATIO_SPEC.map(s => s.group))];
+        let FIN = { quarters: [], data: {} };
+
+        function parseFsCsv(text) {
+            const rows = Papa.parse(text.trim(), { skipEmptyLines: false }).data;
+            const h = rows.findIndex(r => (r[0] || '').trim() === '구분' && (r[1] || '').trim() === '항목');
+            if (h < 0) throw new Error('재무제표 머리글 행을 찾지 못했습니다');
+            const head = rows[h].map(c => (c || '').trim());
+            const qCols = head.map((c, i) => /분기$/.test(c) ? i : -1).filter(i => i >= 0);
+            const data = {};
+            qCols.forEach(i => data[head[i]] = {});
+            for (const r of rows.slice(h + 1)) {
+                const item = (r[1] || '').trim();
+                if (item) qCols.forEach(i => data[head[i]][item] = parseNum(r[i]));
+            }
+            // 매출액이 채워진 분기만 사용 (빈 열 = 아직 안 온 분기)
+            const qs = qCols.map(i => head[i]).filter(q => data[q]['매출액'] !== null && data[q]['매출액'] !== undefined);
+            if (!qs.length || data[qs[0]]['자산총계'] == null) throw new Error('재무제표 값이 없습니다');
+            return { quarters: qs, data };
+        }
+
+        const termVal = (terms, d) => {
+            let s = 0;
+            for (const [c, it] of terms) { const v = d ? d[it] : null; if (v === null || v === undefined) return null; s += c * v; }
+            return s;
+        };
+        function ratioValue(sp, d, pd) {
+            if (!d) return null;
+            if (sp.type === 'growth') {
+                if (!pd) return null;
+                const a = termVal(sp.num, d), b = termVal(sp.num, pd);
+                if (a === null || b === null || b === 0) return null;
+                if (b < 0) return a >= 0 ? '흑자 전환' : '적자 지속';
+                if (a < 0) return '적자 전환';
+                return a / b - 1;
+            }
+            const n = termVal(sp.num, d);
+            if (n === null) return null;
+            if (sp.type === 'amount') return n;
+            const den = termVal(sp.den, d);
+            if (den === null) return null;
+            if (den === 0 && sp.zero) return sp.zero;
+            if (sp.pos ? den <= 0 : den === 0) return null;
+            return sp.type === 'days' ? 91.25 * n / den : n / den;
+        }
+        function fmtRatio(v, unit) {
+            if (v === null || v === undefined) return '–';
+            if (typeof v === 'string') return v;
+            if (unit === '%') return (v * 100).toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+            if (unit === '원') return fmtEok(v);
+            if (unit === '일') return v.toFixed(1) + '일';
+            return v.toFixed(2) + unit;
+        }
+        function ratioDelta(sp, v, pv) {
+            if (typeof v !== 'number' || typeof pv !== 'number') return null;
+            const diff = v - pv;
+            let txt = sp.unit === '%' ? (Math.abs(diff) * 100).toFixed(1) + '%p'
+                    : sp.unit === '원' ? fmtEok(Math.abs(diff))
+                    : Math.abs(diff).toFixed(sp.unit === '일' ? 1 : 2) + sp.unit;
+            txt = (diff > 0 ? '+' : diff < 0 ? '−' : '') + txt;
+            const tone = sp.better === 'none' || Math.abs(diff) < 1e-12 ? 'neutral' : ((sp.better === 'up') === (diff > 0) ? 'good' : 'bad');
+            return { diff, txt, tone };
+        }
+        // 기준값으로 양호/주의/위험 판정
+        function ratioFlag(sp, v) {
+            if (typeof v === 'string') return /없음|흑자 전환/.test(v) ? 'good' : /적자/.test(v) ? 'bad' : null;
+            if (typeof v !== 'number' || !sp.flag) return null;
+            const x = sp.unit === '%' ? v * 100 : v, [g, w] = sp.flag;
+            if (sp.better === 'down') return x <= g ? 'good' : x <= w ? 'warn' : 'bad';
+            return x >= g ? 'good' : x >= w ? 'warn' : 'bad';
+        }
+        const FLAG_LABEL = { good: '양호', warn: '주의', bad: '위험' };
+        const finCtx = q => {
+            const qs = FIN.quarters, i = qs.indexOf(q);
+            return { d: FIN.data[q], pd: i > 0 ? FIN.data[qs[i - 1]] : null, ppd: i > 1 ? FIN.data[qs[i - 2]] : null, pq: qs[i - 1] };
+        };
+
+        function renderFinance() {
+            if (!FIN.quarters.length) return;
+            const sel = document.getElementById('finQuarter');
+            const keep = sel.value;
+            sel.innerHTML = FIN.quarters.map(q => `<option value="${esc(q)}">${esc(q)}</option>`).join('');
+            sel.value = FIN.quarters.includes(keep) ? keep : last(FIN.quarters);
+            const q = sel.value, { d, pd, ppd, pq } = finCtx(q);
+
+            document.getElementById('finSource').innerHTML = fsFromSnapshot
+                ? `<i class="fa-solid fa-circle-info"></i> 엑셀 사본 (${FS_SNAPSHOT_DATE}) · 드라이브 파일 업데이트 전이라 사본 사용`
+                : `<i class="fa-solid fa-circle-check"></i> 구글 시트 재무제표 탭`;
+            document.getElementById('finSource').className = 'fin-source' + (fsFromSnapshot ? ' is-snapshot' : '');
+
+            document.getElementById('finGroups').innerHTML = FIN_GROUPS.map(g => {
+                const specs = RATIO_SPEC.filter(s => s.group === g);
+                const rows = specs.map(sp => {
+                    const v = ratioValue(sp, d, pd), pv = ratioValue(sp, pd, ppd);
+                    const dl = ratioDelta(sp, v, pv), fl = ratioFlag(sp, v);
+                    const tip = `${sp.name}\n산식: ${sp.formula}${sp.note ? '\n참고: ' + sp.note : ''}${pq ? `\n전분기(${pq}): ${fmtRatio(pv, sp.unit)}` : ''}`;
+                    return `<div class="fin-row" title="${esc(tip)}">
+                        <span class="fin-row__name">${fl ? `<i class="fin-dot fin-dot--${fl}" aria-label="${FLAG_LABEL[fl]}"></i>` : '<i class="fin-dot"></i>'}${esc(sp.name)}</span>
+                        <span class="fin-row__value${fl ? ' fin-flag--' + fl : ''}">${esc(fmtRatio(v, sp.unit))}</span>
+                        ${dl ? `<span class="delta delta--${dl.tone}">${esc(dl.txt)}</span>` : '<span class="delta delta--neutral">–</span>'}
+                    </div>`;
+                }).join('');
+                return `<div class="glass-panel fin-card">
+                    <div class="fin-card__head"><span class="fin-card__title">${esc(g)}</span><span class="fin-card__count">${specs.length}개 · 전분기 대비</span></div>
+                    ${rows}</div>`;
+            }).join('');
+
+            // 비율 선택 목록 (처음 한 번)
+            const rsel = document.getElementById('finRatioSelect');
+            if (!rsel.options.length) {
+                rsel.innerHTML = FIN_GROUPS.map(g => `<optgroup label="${esc(g)}">${RATIO_SPEC.filter(s => s.group === g)
+                    .map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('')}</optgroup>`).join('');
+                rsel.value = '영업이익률';
+            }
+            renderFinanceCharts();
+            renderFinanceTable(q);
+            if (calcQuarter !== q) fillCalculator();
+        }
+
+        function renderFinanceCharts() {
+            if (!FIN.quarters.length) return;
+            const labels = FIN.quarters.map(shortQ);
+            const sp = RATIO_SPEC.find(s => s.name === document.getElementById('finRatioSelect').value) || RATIO_SPEC[1];
+            const vals = FIN.quarters.map(q => { const { d, pd } = finCtx(q); const v = ratioValue(sp, d, pd); return typeof v === 'number' ? v : null; });
+            const scale = sp.unit === '%' ? 100 : sp.unit === '원' ? 1e-8 : 1;
+            const unitLabel = sp.unit === '원' ? '억' : sp.unit;
+            const tick = (v, full) => (full ? Number(v).toLocaleString('ko-KR', { maximumFractionDigits: sp.unit === '%' ? 1 : 2 }) : v) + unitLabel;
+            document.getElementById('finTrendDesc').textContent = `${sp.formula} · ${sp.better === 'up' ? '높을수록 좋음' : sp.better === 'down' ? '낮을수록 좋음' : '방향 판단 없음'}`;
+            const opts = baseOptions('', tick);
+            opts.plugins.legend.display = false;
+            opts.scales.y.grid.color = ctx => ctx.tick.value === 0 ? css('--chart-zero') : css('--chart-grid');
+            draw('chartRatio', { data: { labels, datasets: [lineDs(sp.name, vals.map(v => v === null ? null : +(v * scale).toFixed(3)), css('--series-4'))] }, options: opts });
+
+            const fmtEokTick = (v, full) => (full ? v.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) : v.toLocaleString('ko-KR')) + '억';
+            const col = k => FIN.quarters.map(q => eok(FIN.data[q][k]));
+            draw('chartBalance', { data: { labels, datasets: [
+                barDs('자산총계', col('자산총계'), css('--series-1')),
+                barDs('부채총계', col('부채총계'), css('--series-2')),
+                barDs('자본총계', col('자본총계'), css('--series-3'))
+            ] }, options: baseOptions('', fmtEokTick) });
+        }
+
+        function renderFinanceTable(cur) {
+            const qs = FIN.quarters;
+            document.getElementById('finHead').innerHTML = `<tr><th>비율</th>${qs.map(q =>
+                `<th class="num${q === cur ? ' is-current' : ''}">${esc(shortQ(q))}</th>`).join('')}<th>산식 · 좋은 방향</th></tr>`;
+            let html = '';
+            for (const g of FIN_GROUPS) {
+                html += `<tr class="row-section"><td colspan="${qs.length + 2}">${esc(g)}</td></tr>`;
+                for (const sp of RATIO_SPEC.filter(s => s.group === g)) {
+                    html += `<tr><td class="cell-kpi">${esc(sp.name)}<span class="cell-unit">${esc(sp.unit)}</span></td>` +
+                        qs.map(q => {
+                            const { d, pd } = finCtx(q), v = ratioValue(sp, d, pd), fl = ratioFlag(sp, v);
+                            return `<td class="cell-num${q === cur ? ' is-current' : ''}${v === null ? ' is-empty' : ''}${fl ? ' fin-flag--' + fl : ''}">${esc(fmtRatio(v, sp.unit))}</td>`;
+                        }).join('') +
+                        `<td class="cell-note">${esc(sp.formula)}<span class="cell-note__sub">${sp.better === 'up' ? '높을수록 좋음' : sp.better === 'down' ? '낮을수록 좋음' : '방향 판단 없음'}${sp.note ? ' · ' + esc(sp.note) : ''}</span></td></tr>`;
+                }
+            }
+            document.getElementById('finBody').innerHTML = html;
+        }
+
+        function exportFinanceCSV() {
+            const qs = FIN.quarters;
+            const data = RATIO_SPEC.map(sp => {
+                const row = { 구분: sp.group, 비율: sp.name, 단위: sp.unit };
+                qs.forEach(q => { const { d, pd } = finCtx(q); const v = ratioValue(sp, d, pd); row[q] = typeof v === 'number' ? (sp.unit === '%' ? +(v * 100).toFixed(2) : +v.toFixed(4)) : (v ?? ''); });
+                return { ...row, 산식: sp.formula };
+            });
+            const blob = new Blob(['﻿' + Papa.unparse(data)], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `재무비율_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a); a.click(); a.remove();
+        }
+
+        /* ---------- 재무비율 계산기 (억원 단위 입력 → 바로 계산) ---------- */
+        const CALC_GROUPS = [
+            ['손익', ['매출액', '청산 매출액', '매출원가', '판매및관리비', '광고비', '판매촉진비', '재고관리비', '연구개발비', '이자비용', '당기순이익']],
+            ['현금흐름 · 자산', ['영업활동 현금흐름', '현금 및 현금등가물', '단기매매증권', '매출채권', '당좌자산', '재고자산', '유동자산', '비유동자산']],
+            ['부채 · 자본', ['유동부채', '비유동부채', '자본총계']]
+        ];
+        const CALC_KEY = ['매출총이익률', '영업이익률', '순이익률', '판관비율', 'ROE (자기자본이익률)', 'ROA (총자산이익률)', '부채비율', '자기자본비율',
+            '이자보상배율', '유동비율', '당좌비율', '총자산회전율', '재고자산회전율', '매출액증가율', '영업이익증가율', '영업현금흐름 마진'];
+        let calcState = {}, calcQuarter = null, calcShowAll = false;
+
+        function fillCalculator() {
+            const q = document.getElementById('finQuarter').value;
+            if (!q) return;
+            calcQuarter = q;
+            calcState = { ...FIN.data[q] };
+            document.getElementById('calcInputs').innerHTML = CALC_GROUPS.map(([g, items]) => `
+                <fieldset class="calc-group"><legend>${esc(g)}</legend>${items.map(it => `
+                    <label class="calc-field"><span>${esc(it)}</span>
+                        <span class="calc-input"><input type="number" step="0.1" data-calc="${esc(it)}" value="${calcState[it] == null ? '' : Math.round(calcState[it] / 1e7) / 10}" aria-label="${esc(it)} (억원)"><em>억</em></span>
+                    </label>`).join('')}</fieldset>`).join('') +
+                `<p class="calc-derived" id="calcDerived"></p>`;
+            renderCalcResults();
+        }
+        function calcData() {
+            const d = { ...calcState };
+            d['매출총이익'] = (d['매출액'] ?? 0) - (d['매출원가'] ?? 0);
+            d['영업이익'] = d['매출총이익'] - (d['판매및관리비'] ?? 0);
+            d['부채총계'] = (d['유동부채'] ?? 0) + (d['비유동부채'] ?? 0);
+            d['자산총계'] = (d['유동자산'] ?? 0) + (d['비유동자산'] ?? 0);
+            return d;
+        }
+        function renderCalcResults() {
+            const d = calcData(), { d: actual, pd } = finCtx(calcQuarter);
+            const gap = d['자산총계'] - d['부채총계'] - d['자본총계'];
+            document.getElementById('calcDerived').innerHTML =
+                `자동 계산 — 매출총이익 <b>${fmtEok(d['매출총이익'])}</b> · 영업이익 <b>${fmtEok(d['영업이익'])}</b> · 자산총계 <b>${fmtEok(d['자산총계'])}</b> · 부채총계 <b>${fmtEok(d['부채총계'])}</b>` +
+                (Math.abs(gap) >= 1e8 ? `<br><span class="calc-warn"><i class="fa-solid fa-triangle-exclamation"></i> 자산총계와 부채+자본이 ${fmtEok(Math.abs(gap))} 차이 나요 (보고서에서는 이익잉여금으로 맞춤)</span>` : '');
+            const specs = calcShowAll ? RATIO_SPEC : CALC_KEY.map(n => RATIO_SPEC.find(s => s.name === n)).filter(Boolean);
+            document.getElementById('calcResults').innerHTML =
+                `<div class="calc-results__head"><span>계산 결과 <small>· ${esc(calcQuarter)} 실제값 대비</small></span>
+                    <button class="btn btn-muted btn-page" onclick="calcShowAll=!calcShowAll; renderCalcResults()">${calcShowAll ? '핵심 16개만' : `전체 ${RATIO_SPEC.length}개 보기`}</button></div>
+                 <div class="calc-results__grid">${specs.map(sp => {
+                    const v = ratioValue(sp, d, pd), av = ratioValue(sp, actual, pd), fl = ratioFlag(sp, v), dl = ratioDelta(sp, v, av);
+                    return `<div class="calc-res" title="${esc(sp.formula)}">
+                        <span class="calc-res__name">${esc(sp.name)}</span>
+                        <span class="calc-res__value${fl ? ' fin-flag--' + fl : ''}">${esc(fmtRatio(v, sp.unit))}</span>
+                        <span class="calc-res__sub">${dl && Math.abs(dl.diff) > 1e-12 ? `<span class="delta delta--${dl.tone}">${esc(dl.txt)}</span>` : '실제와 같음'}</span>
+                    </div>`; }).join('')}</div>`;
+        }
+        document.addEventListener('input', e => {
+            const k = e.target.dataset && e.target.dataset.calc;
+            if (!k) return;
+            const v = parseFloat(e.target.value);
+            calcState[k] = isNaN(v) ? null : v * 1e8;
+            renderCalcResults();
+        });
+
+        function renderPeriodTexts() {
+            document.getElementById('statusDesc').textContent = `${curQ()} 값 기준 자동 판정 · 위험 / 주의 / 양호`;
+            document.getElementById('trendDesc').textContent = `${quarters[0]} → ${curQ()} · 빈 칸은 원본 데이터 없음`;
+            document.getElementById('kpiTableDesc').textContent = `KPI 요약 시트 원본 · 전분기 대비는 ${shortQ(curQ())} vs ${shortQ(prevQ())} (비율 지표는 %p 차이)`;
+            const m = COMP_TITLE.match(/(\d+차년도 \d분기)/), src = COMP_TITLE.match(/출처:\s*([^)]+)/);
+            document.getElementById('compTitle').textContent = `경쟁사 비교 (${m ? m[1] : '최근 분기'})`;
+            document.getElementById('compDesc').textContent = `${src ? '출처: ' + src[1].trim() + ' · ' : ''}우리 회사(B사)만 색으로 강조`;
+        }
+
         function renderAll() {
+            renderPeriodTexts();
+            renderFinance();
             renderKPIs();
             renderInsight();
             renderStatus();
@@ -648,6 +1042,16 @@ D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,
         /* =============================================================
            핵심 KPI 카드
            ============================================================= */
+        // 최신 분기 · 직전 분기
+        const curQ = () => last(quarters), prevQ = () => prev(quarters);
+        const qLabelAt = i => quarters[i] ? shortQ(quarters[i]) : '';
+        const josa = (w, a, b) => { const c = w.charCodeAt(w.length - 1); return (c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28) ? a : b; };
+        function peakOf(values, best = 'max') {
+            let idx = -1;
+            values.forEach((v, i) => { if (v === null) return; if (idx < 0 || (best === 'max' ? v > values[idx] : v < values[idx])) idx = i; });
+            return { i: idx, v: values[idx], label: qLabelAt(idx) };
+        }
+
         function renderKPIs() {
             const cards = [
                 { name: '매출액',            icon: 'fa-sack-dollar',      variant: 'kpi--records' },
@@ -660,9 +1064,9 @@ D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,
                 return `
                 <div class="glass-panel kpi-card ${c.variant}">
                     <div class="kpi-card__main">
-                        <span class="kpi-card__title">${esc(c.name)} · 4분기</span>
+                        <span class="kpi-card__title">${esc(c.name)} · ${esc(shortQ(curQ()))}</span>
                         <p class="kpi-card__value">${esc(fmt(last(k.values), k.unit))}</p>
-                        <div class="kpi-card__meta">${deltaBadge(k)}<span>3분기 ${esc(fmt(prev(k.values), k.unit))}</span></div>
+                        <div class="kpi-card__meta">${deltaBadge(k)}<span>${esc(shortQ(prevQ()))} ${esc(fmt(prev(k.values), k.unit))}</span></div>
                     </div>
                     <div class="kpi-card__icon"><i class="fa-solid ${c.icon}"></i></div>
                 </div>`;
@@ -670,34 +1074,49 @@ D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,
         }
 
         /* =============================================================
-           진단 요약 (값에 따라 문장 방향이 바뀜)
+           진단 요약 (값에 따라 제목·문장 방향이 바뀜)
            ============================================================= */
         function renderInsight() {
             const rev = K('매출액'), opm = K('영업이익률'), sga = K('판관비율');
             const sold = K('판매량'), made = K('생산량'), stock = K('기말재고');
             const cf = K('영업활동 현금흐름'), loan = K('긴급자금대출'), plan = K('매출 계획 달성률');
+            const L = v => last(v.values), P = v => prev(v.values);
 
-            const revUp = last(rev.values) >= prev(rev.values);
-            const opmDown = last(opm.values) < prev(opm.values);
-            const cfStreak = trailingStreak(cf.values, v => v < 0);
+            // 제목: 좋아진 것 · 나빠진 것
+            const good = [], bad = [];
+            (L(rev) >= P(rev) ? good : bad).push('매출');
+            (L(opm) >= P(opm) ? good : bad).push('이익');
+            (L(cf) >= P(cf) ? good : bad).push('현금');
+            (L(stock) <= P(stock) ? good : bad).push('재고');
+            const g = good.join('·'), b = bad.join('·');
+            const title = !bad.length ? `${g} 모두 좋아졌어요`
+                : !good.length ? `${b} 모두 나빠졌어요`
+                : `${g}${josa(g, '은', '는')} 좋아졌지만 ${b}${josa(b, '은', '는')} 나빠졌어요`;
+            document.getElementById('insightTitle').textContent = title;
+            document.getElementById('insightLabel').textContent = `${shortQ(curQ())} 진단`;
 
             const parts = [];
-            parts.push(`4분기 매출은 <strong>${fmt(last(rev.values), '원')}</strong>으로 전분기보다 <strong>${esc(signed(rev.change))}</strong> ${revUp ? '늘었고' : '줄었고'}, 계획 대비 <strong>${fmt(last(plan.values), '%')}</strong>를 달성했습니다.`);
-            parts.push(`영업이익률은 <strong>${fmt(prev(opm.values), '%')} → ${fmt(last(opm.values), '%')}</strong>로 ${opmDown ? '떨어졌는데' : '올랐고'}, 판관비율이 <strong>${fmt(last(sga.values), '%')}</strong>${opmDown ? '까지 오른 것이 주원인입니다.' : '입니다.'}`);
-            if (last(made.values) > last(sold.values)) {
-                parts.push(`생산(${fmt(last(made.values), '개')})이 판매(${fmt(last(sold.values), '개')})보다 많아 기말재고가 <strong>${fmt(last(stock.values), '개')}</strong>로 쌓였습니다.`);
-            }
-            if (last(cf.values) < 0) {
-                parts.push(`영업활동 현금흐름은 <strong>${fmt(last(cf.values), '원')}</strong>${cfStreak >= 2 ? `으로 ${cfStreak}분기 연속 적자` : ' 적자'}이고, 긴급자금대출 <strong>${fmt(last(loan.values), '원')}</strong>으로 버티고 있습니다.`);
+            parts.push(`${curQ()} 매출은 <strong>${fmt(L(rev), '원')}</strong>으로 전분기보다 <strong>${esc(signed(rev.change))}</strong> ${L(rev) >= P(rev) ? '늘었고' : '줄었고'}, 계획 대비 <strong>${fmt(L(plan), '%')}</strong>를 달성했습니다.`);
+            if (rev.note && /청산/.test(rev.note)) parts.push(`단, ${esc(rev.note)}.`);
+            if (L(opm) < 0) parts.push(`영업이익률은 <strong>${fmt(P(opm), '%')} → ${fmt(L(opm), '%')}</strong>로 적자가 됐습니다.`);
+            else parts.push(`영업이익률은 <strong>${fmt(P(opm), '%')} → ${fmt(L(opm), '%')}</strong>로 ${L(opm) < P(opm) ? '떨어졌고' : '올랐고'}, 판관비율은 <strong>${fmt(L(sga), '%')}</strong>입니다.`);
+            if (L(made) > L(sold)) parts.push(`생산(${fmt(L(made), '개')})이 판매(${fmt(L(sold), '개')})보다 많아 기말재고가 <strong>${fmt(L(stock), '개')}</strong>${L(stock) > P(stock) ? '로 늘었습니다' : ' 남았습니다'}.`);
+            else if (L(stock) < P(stock)) parts.push(`기말재고는 <strong>${fmt(L(stock), '개')}</strong>로 줄었습니다.`);
+            if (L(cf) < 0) {
+                const n = trailingStreak(cf.values, v => v < 0);
+                parts.push(`영업활동 현금흐름은 <strong>${fmt(L(cf), '원')}</strong>${n >= 2 ? `으로 ${n}분기 연속 적자` : ' 적자'}${L(loan) > 0 ? `이고, 긴급자금대출 <strong>${fmt(L(loan), '원')}</strong>으로 버티고 있습니다.` : '입니다.'}`);
+            } else {
+                parts.push(`영업활동 현금흐름은 <strong>${fmt(L(cf), '원')}</strong>${P(cf) < 0 ? '으로 흑자 전환했습니다' : '입니다'}${L(loan) > 0 ? `. 그래도 긴급자금 <strong>${fmt(L(loan), '원')}</strong>이 필요했습니다.` : '.'}`);
             }
             document.getElementById('insightText').innerHTML = parts.join(' ');
         }
 
         /* =============================================================
-           경고 지표 — 기준값으로 위험 / 주의 / 양호 판정
+           경고 지표 — 기준값으로 위험 / 주의 / 양호 판정 (최신 분기 기준)
            ============================================================= */
         function buildStatus() {
             const items = [];
+            const pq = shortQ(prevQ());
             const add = (level, kpiName, title, detail) => {
                 const k = K(kpiName);
                 items.push({ level, title, value: fmt(last(k.values), k.unit), detail });
@@ -706,37 +1125,45 @@ D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,
             const cf = K('영업활동 현금흐름').values;
             if (last(cf) < 0) {
                 const n = trailingStreak(cf, v => v < 0);
-                add('critical', '영업활동 현금흐름', '영업 현금흐름 적자', n >= 2 ? `${n}분기 연속 적자 · 3분기 ${fmt(prev(cf), '원')}` : '이번 분기 적자 전환');
-            }
+                add('critical', '영업활동 현금흐름', '영업 현금흐름 적자', n >= 2 ? `${n}분기 연속 적자 · ${pq} ${fmt(prev(cf), '원')}` : '이번 분기 적자 전환');
+            } else if (prev(cf) < 0) add('good', '영업활동 현금흐름', '영업 현금흐름 흑자 전환', `${pq} ${fmt(prev(cf), '원')}`);
             const loan = K('긴급자금대출');
             if (last(loan.values) > 0) add('critical', '긴급자금대출', '긴급자금대출 발생', loan.note || '현금 부족으로 긴급자금 차입');
 
+            const opm = K('영업이익률').values, opmPeak = peakOf(opm, 'max');
+            if (last(opm) < 0) add('critical', '영업이익률', '영업 적자', `최고 ${opmPeak.label} ${fmt(opmPeak.v, '%')}`);
+            else {
+                const s = trailingStreak(opm, (v, p) => p !== null && p !== undefined && v < p);
+                if (s >= 1) add('warning', '영업이익률', '영업이익률 하락', `${s}분기 연속 하락 · 최고 ${opmPeak.label} ${fmt(opmPeak.v, '%')}`);
+            }
+
             const inv = K('재고 보유기간').values;
-            if (last(inv) >= 0.5) add(last(inv) >= 1 ? 'critical' : 'warning', '재고 보유기간', '재고 과다', `한 분기 판매량의 ${last(inv).toFixed(2)}배 · 3분기 ${prev(inv).toFixed(2)}배`);
+            if (last(inv) >= 0.5) add(last(inv) >= 1 ? 'critical' : 'warning', '재고 보유기간', '재고 과다', `한 분기 판매량의 ${last(inv).toFixed(2)}배 · ${pq} ${prev(inv).toFixed(2)}배`);
+            else if (last(inv) < prev(inv)) add('good', '재고 보유기간', '재고 감소', `${pq} ${prev(inv).toFixed(2)}배`);
 
             const sell = K('판매율(소진율)').values;
-            if (last(sell) < 70) add(last(sell) < 50 ? 'critical' : 'warning', '판매율(소진율)', '판매율 저조', `판매가능량의 ${(100 - last(sell)).toFixed(1)}%가 재고로 남음 · 3분기 ${fmt(prev(sell), '%')}`);
+            if (last(sell) < 70) add(last(sell) < 50 ? 'critical' : 'warning', '판매율(소진율)', '판매율 저조', `판매가능량의 ${(100 - last(sell)).toFixed(1)}%가 재고로 남음 · ${pq} ${fmt(prev(sell), '%')}`);
 
             const debt = K('부채비율').values;
-            if (last(debt) >= 60) add(last(debt) >= 100 ? 'critical' : 'warning', '부채비율', '부채비율 급등', `3분기 ${fmt(prev(debt), '%')}에서 ${(last(debt) - prev(debt)).toFixed(1)}%p 상승`);
-
-            const opm = K('영업이익률').values;
-            const opmStreak = trailingStreak(opm, (v, p) => p !== null && p !== undefined && v < p);
-            if (opmStreak >= 1) add('warning', '영업이익률', '영업이익률 하락', `${opmStreak}분기 연속 하락 · 2분기 ${fmt(opm[2], '%')}`);
+            if (last(debt) >= 60) {
+                const d = last(debt) - prev(debt);
+                add(last(debt) >= 100 ? 'critical' : 'warning', '부채비율', '부채비율 높음', `${pq} ${fmt(prev(debt), '%')}에서 ${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(1)}%p`);
+            }
 
             const sga = K('판관비율').values;
-            if (last(sga) >= 50) add('warning', '판관비율', '판관비율 50% 초과', `매출의 절반 이상이 판관비 · 3분기 ${fmt(prev(sga), '%')}`);
+            if (last(sga) >= 50) add('warning', '판관비율', '판관비율 50% 초과', `매출의 절반 이상이 판관비 · ${pq} ${fmt(prev(sga), '%')}`);
+            else if (prev(sga) >= 50 && last(sga) < prev(sga)) add('good', '판관비율', '판관비율 개선', `${pq} ${fmt(prev(sga), '%')}`);
 
-            const credit = K('신용등급').values;
-            if (last(credit) >= 5) add('warning', '신용등급', '신용등급 낮음', `2분기 ${fmt(credit[2], '등급')}에서 하락 (낮을수록 우수)`);
+            const credit = K('신용등급').values, best = peakOf(credit, 'min');
+            if (last(credit) >= 5) add(last(credit) >= 7 ? 'critical' : 'warning', '신용등급', '신용등급 낮음', `${best.label} ${fmt(best.v, '등급')}에서 하락 (낮을수록 우수)`);
 
             // 양호
             const rev = K('매출액');
-            if (last(rev.values) > prev(rev.values)) add('good', '매출액', '매출 성장', `전분기 대비 ${signed(rev.change)}`);
+            if (last(rev.values) > prev(rev.values)) add('good', '매출액', '매출 성장', `전분기 대비 ${signed(rev.change)}${rev.note && /청산/.test(rev.note) ? ' · 청산 매출 포함' : ''}`);
             const q = K('품질등급').values;
-            if (last(q) < prev(q)) add('good', '품질등급', '품질등급 개선', `3분기 ${fmt(prev(q), '등급')} → 4분기 (낮을수록 우수)`);
+            if (last(q) < prev(q)) add('good', '품질등급', '품질등급 개선', `${pq} ${fmt(prev(q), '등급')} → ${fmt(last(q), '등급')} (낮을수록 우수)`);
             const gm = K('매출총이익률').values;
-            if (last(gm) >= prev(gm)) add('good', '매출총이익률', '매출총이익률 유지', `3분기 ${fmt(prev(gm), '%')} → 4분기`);
+            if (last(gm) >= prev(gm)) add('good', '매출총이익률', '매출총이익률 유지', `${pq} ${fmt(prev(gm), '%')}`);
 
             const order = { critical: 0, warning: 1, good: 2 };
             return items.sort((a, b) => order[a.level] - order[b.level]);
@@ -998,7 +1425,7 @@ D사,"144,525,075,600","140,789",17.7%,"12,114,573,377",8.4%,"3,345",0.02분기,
         let wasDark = document.documentElement.classList.contains('dark');
         new MutationObserver(() => {
             const d = document.documentElement.classList.contains('dark');
-            if (d !== wasDark && kpis.length) { wasDark = d; renderTrendCharts(); renderCompetitors(); }
+            if (d !== wasDark && kpis.length) { wasDark = d; renderTrendCharts(); renderCompetitors(); renderFinanceCharts(); }
         }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
         function showError(msg) {
