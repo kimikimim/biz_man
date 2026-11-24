@@ -312,3 +312,73 @@ body.page-dashboard { display: flex; flex-direction: column; }
   .calc-group { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
   .calc-group legend { grid-column: 1 / -1; }
 }
+
+/* ---------------------------------------------------------------------
+   의사결정 시뮬레이터
+   --------------------------------------------------------------------- */
+.sim-presets { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.sim-chip {
+  height: 2rem; padding: 0 0.8rem; border-radius: var(--radius-full);
+  border: 1px solid var(--border-default); background: var(--bg-surface);
+  font-size: var(--text-xs); font-weight: 700; color: var(--text-body);
+}
+.sim-chip:hover { border-color: var(--indigo-500); }
+.sim-chip.is-active { background: var(--indigo-600); border-color: var(--indigo-600); color: #fff; }
+.sim-panel { padding: 1.1rem 1.25rem; border-radius: var(--radius-2xl); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 0.9rem; }
+.sim-note { margin: 0; font-size: var(--text-11); line-height: 1.6; color: var(--text-secondary); }
+.sim-layout { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1200px) { .sim-layout { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); } .sim-result { position: sticky; top: 6rem; } }
+.sim-form-wrap { overflow-x: auto; border: 1px solid var(--border-default); border-radius: var(--radius-xl); }
+.sim-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); min-width: 34rem; }
+.sim-table th { position: sticky; top: 0; background: var(--bg-muted); padding: 0.45rem 0.5rem; text-align: left; font-size: var(--text-11); color: var(--text-secondary); z-index: 1; }
+.sim-table td { padding: 0.25rem 0.4rem; border-top: 1px solid var(--border-subtle); vertical-align: middle; }
+.sim-table tr.sim-role-start td { border-top: 1px solid var(--border-default); }
+.sim-role { width: 3rem; font-weight: 800; color: var(--accent-text); font-size: var(--text-11); }
+.sim-label { white-space: nowrap; color: var(--text-body); font-weight: 600; }
+.sim-in { position: relative; display: block; min-width: 6.5rem; }
+.sim-in input {
+  width: 100%; height: 1.85rem; padding: 0 2.2rem 0 0.45rem; border-radius: var(--radius-md);
+  border: 1px solid var(--border-default); background: var(--bg-muted); color: var(--text-primary);
+  font-size: var(--text-xs); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums;
+}
+.sim-in input:focus { outline: none; border-color: var(--indigo-500); background: var(--bg-surface); box-shadow: var(--ring-focus); }
+.sim-in em { position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%); font-style: normal; font-size: var(--text-10); color: var(--text-tertiary); }
+.sim-table td[colspan] .sim-in { display: inline-block; width: 12rem; vertical-align: middle; }
+.sim-hint { margin-left: 0.5rem; font-size: var(--text-11); color: var(--accent-text); font-weight: 700; }
+.sim-na { font-size: var(--text-10); color: var(--text-tertiary); }
+
+.sim-tiles { display: grid; gap: 0.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 640px) { .sim-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.sim-tile { padding: 0.65rem 0.75rem; border-radius: var(--radius-lg); background: var(--bg-muted); display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.sim-tile--bad  { background: var(--critical-bg); }
+.sim-tile--good { background: var(--good-bg); }
+.sim-tile__label { font-size: var(--text-10); font-weight: 700; color: var(--text-secondary); }
+.sim-tile__value { font-size: var(--text-lg); font-weight: 900; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.sim-tile__sub { font-size: var(--text-10); color: var(--text-secondary); }
+.sim-tile .delta { align-self: flex-start; }
+.sim-caption { margin: 0.4rem 0 0; font-size: var(--text-10); color: var(--text-tertiary); }
+.sim-warn { list-style: none; margin: 0.6rem 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.sim-warn li { display: flex; gap: 0.45rem; align-items: flex-start; padding: 0.45rem 0.6rem; border-radius: var(--radius-md); font-size: var(--text-xs); line-height: 1.45; }
+.sim-warn li i { margin-top: 0.15rem; }
+.sim-warn--bad  { background: var(--critical-bg); color: var(--critical); }
+.sim-warn--warn { background: var(--warning-bg); color: var(--warning); }
+.sim-ok { margin: 0.6rem 0; font-size: var(--text-xs); color: var(--good); font-weight: 700; }
+.sim-country { margin-top: 0.2rem; }
+.sim-pl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.25rem 1rem; margin: 0.75rem 0 0.25rem; font-size: var(--text-xs); }
+.sim-pl div { display: flex; justify-content: space-between; padding: 0.3rem 0; border-bottom: 1px dashed var(--border-default); }
+.sim-pl span { color: var(--text-secondary); }
+.sim-pl b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.sim-details { margin-top: 0.5rem; font-size: var(--text-xs); }
+.sim-details summary { cursor: pointer; font-weight: 700; color: var(--text-body); display: flex; align-items: center; gap: 0.5rem; }
+.sim-bars { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.5rem; }
+.sim-bar { display: grid; grid-template-columns: 7rem minmax(0, 1fr) 4.5rem; align-items: center; gap: 0.5rem; font-size: var(--text-11); color: var(--text-secondary); }
+.sim-bar i { display: block; height: 0.55rem; border-radius: 0 4px 4px 0; background: var(--series-1); }
+.sim-bar b { text-align: right; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.sim-sub { margin: 0.9rem 0 0.45rem; font-size: var(--text-sm); font-weight: 800; color: var(--text-primary); }
+.sim-sub small { font-weight: 500; color: var(--text-tertiary); }
+.sim-assume-wrap { border-top: 1px solid var(--border-default); padding-top: 0.75rem; }
+.sim-assume-grid { display: grid; gap: 0.5rem 1.25rem; grid-template-columns: minmax(0, 1fr); margin: 0.75rem 0; }
+@media (min-width: 768px) { .sim-assume-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sim-assume { display: grid; grid-template-columns: 9rem minmax(0, 1fr) 4.5rem; align-items: center; gap: 0.6rem; font-size: var(--text-11); color: var(--text-secondary); cursor: help; }
+.sim-assume input { accent-color: var(--indigo-500); }
+.sim-assume b { text-align: right; color: var(--text-primary); font-variant-numeric: tabular-nums; }

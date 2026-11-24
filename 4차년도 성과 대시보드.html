@@ -190,6 +190,27 @@
             </div>
         </section>
 
+        <!-- ---------- 의사결정 시뮬레이터 ---------- -->
+        <div class="section-heading" id="simulator">
+            <div>
+                <h2 class="section-heading__title"><i class="fa-solid fa-flask-vial"></i> 5차년도 2분기 의사결정 시뮬레이터</h2>
+                <p class="section-heading__desc">biz-manager 의사결정 양식과 같은 항목 · 값을 바꾸면 판매·이익·재고·현금·재무비율을 바로 예측 (추정치)</p>
+            </div>
+            <div id="simPresets" class="sim-presets"></div>
+        </div>
+        <section class="glass-panel sim-panel">
+            <p class="sim-note" id="simPresetNote"></p>
+            <div class="sim-layout">
+                <div class="sim-form-wrap"><div id="simForm"></div></div>
+                <div class="sim-result" id="simResult" aria-live="polite"></div>
+            </div>
+            <details class="sim-details sim-assume-wrap">
+                <summary><i class="fa-solid fa-sliders"></i> 가정 조정 (수요 반응·비용) <button type="button" id="simResetAssume" class="btn btn-muted btn-page">기본값</button></summary>
+                <div id="simAssume" class="sim-assume-grid"></div>
+                <p class="sim-note">비용 공식(급여·판촉·광고·물류·교육·노무·현금회수 60%)은 5차년도 1분기 보고서와 원 단위까지 일치하도록 맞췄어요. 수요는 "1분기 실제 판매량 × 경기(GDP) 변화 × 내 결정 변화의 영향"으로 추정하고, 경쟁사는 1분기 결정을 유지한다고 가정해요 — 실제 결과와 다를 수 있어요.</p>
+            </details>
+        </section>
+
         <!-- ---------- 재무비율 분석 ---------- -->
         <div class="section-heading" id="finance">
             <div>
@@ -1030,6 +1051,7 @@ D사,"141,123,558,200","142,673",22.4%,"25,781,630,919",18.3%,"11,306",0.08분�
         function renderAll() {
             renderPeriodTexts();
             renderFinance();
+            if (window.renderSimulator) renderSimulator();
             renderKPIs();
             renderInsight();
             renderStatus();
@@ -1437,5 +1459,6 @@ D사,"141,123,558,200","142,673",22.4%,"25,781,630,919",18.3%,"11,306",0.08분�
         setupAutoSync();
         loadData();
     </script>
+    <script src="simulator.js"></script>
 </body>
 </html>
